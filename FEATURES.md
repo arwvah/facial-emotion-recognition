@@ -21,7 +21,7 @@
 | Skipping / async | Optical flow between detections; optional inference intervals; bounded worker prefetch | Validate missed transients and speed on the target stream |
 | ONNX/OpenVINO / GPU | ONNX input adapters, paired-checksum OpenVINO IR export, provider selection | GPU/provider-specific hardware is not available for validation here |
 | INT8 | Static QDQ candidate conversion, independent test-set accuracy gate, validation manifest | No production INT8 approval without representative calibration/test data |
-| Engineering | Unit/integration tests, full-module mypy, lint/format, GitHub Actions workflow | Hosted CI runs after the repository is pushed to GitHub |
+| Engineering | 61 passing tests, full-module mypy, lint/format, GitHub Actions workflow | Initial hosted CI run passed; see the repository Actions tab for current status |
 | Privacy / ethics | Consent notice/ack flag, no automatic inference-time downloads, local defaults, model card | Obtain consent and assess suitability for the actual use case |
 
 There is no default trained AU/VA model, labeled evaluation dataset, or fabricated benchmark.

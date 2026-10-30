@@ -36,9 +36,14 @@
   `outputs/auxiliary-layout-fixture.png`. Auxiliary layout values are synthetic fixtures; no
   trained AU/VA model was supplied. Local reports include `outputs/async-v1.html`.
 
+- Published publicly at [arwvah/facial-emotion-recognition](https://github.com/arwvah/facial-emotion-recognition).
+  The [initial GitHub Actions run](https://github.com/arwvah/facial-emotion-recognition/actions/runs/41130512220)
+  passed dependency installation, lint, formatting, mypy and all 61 tests on the hosted Linux runner.
+  Downloaded weights, local input/output images and videos, environments and build artifacts are
+  excluded from Git.
+
 **Unverified / data dependent:** physical webcam and GPU execution; Docker build/run (daemon
-access denied, passwordless sudo unavailable); hosted GitHub Actions execution (workflow supplied
-but not pushed/run here); real accuracy, calibration improvement and demographic fairness; trained
+access denied, passwordless sudo unavailable); real accuracy, calibration improvement and demographic fairness; trained
 AU/VA outputs; production INT8 approval. No representative labeled dataset or auxiliary weights
 were provided. See FEATURES.md for the full implementation/status matrix.
 
