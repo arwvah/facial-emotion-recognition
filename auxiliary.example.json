@@ -1,0 +1,14 @@
+{
+  "path": "YOUR_TRAINED_AUXILIARY_MODEL.onnx",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "width": 224,
+  "height": 224,
+  "color": "rgb",
+  "scale": 0.00392156862745098,
+  "mean": [0.485, 0.456, 0.406],
+  "std": [0.229, 0.224, 0.225],
+  "auxiliary_outputs": [
+    {"name": "va", "kind": "valence_arousal", "labels": ["valence", "arousal"], "range": [-1, 1]},
+    {"name": "au", "kind": "action_units", "labels": ["AU01", "AU02", "AU12", "AU45"], "range": [0, 5]}
+  ]
+}

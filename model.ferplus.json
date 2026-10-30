@@ -1,0 +1,12 @@
+{
+  "path": "models/emotion-ferplus-8.onnx",
+  "sha256": "a2a2ba6a335a3b29c21acb6272f962bd3d47f84952aaffa03b60986e04efa61c",
+  "labels": ["neutral", "happy", "surprise", "sad", "angry", "disgust", "fear", "contempt"],
+  "width": 64,
+  "height": 64,
+  "color": "gray",
+  "scale": 1.0,
+  "mean": [0.0],
+  "std": [1.0],
+  "probabilities": false
+}

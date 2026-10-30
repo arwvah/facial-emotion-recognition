@@ -1,0 +1,32 @@
+# CLI flags override these values. Paths are relative to this YAML file.
+threshold: 0.5
+temperature: 1.0        # Manual setting is not evidence of calibration.
+calibration: null      # Artifact fitted with expression-lab-evaluate calibrate
+detector: yunet
+engine: onnx           # onnx / opencv / openvino
+provider: CPUExecutionProvider
+model_spec: null       # JSON model/preprocessing manifest, with mandatory checksum
+auxiliary: null        # Trained VA/AU ONNX model manifest; absent outputs remain null
+align: true
+tta: false             # Original + horizontal flip + small center crop (3 forward passes)
+quality_mode: skip     # skip: avoid CNN on poor crops; flag: infer but label uncertain
+min_face_size: 48
+min_brightness: 25
+max_brightness: 240
+min_sharpness: 20
+smoothing: 0.25
+min_overlap: 0.3
+detect_every: 1
+infer_every: 1
+async_pipeline: false
+history_size: 240
+privacy_blur: false    # Pixelates detected faces; missed detections cannot be anonymized
+overlays: true
+no_storage: false      # true forbids exports, reports, snapshots and model downloads
+local_only: true       # Webhooks require explicit false
+consent_ack: false     # Records acknowledgement; notice still explains limitations
+event_label: happy
+event_seconds: 2
+event_confidence: 0.7
+event_cooldown: 10
+webhook: null

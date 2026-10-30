@@ -1,0 +1,17 @@
+.venv/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+__pycache__/
+.ruff_cache/
+models/*.onnx
+models/*.part
+outputs/
+*.egg-info/
+.mypy_cache/
+build/
+dist/
+models/*.xml
+models/*.bin
