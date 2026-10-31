@@ -1,5 +1,6 @@
 """Desktop dashboard drawing and explicit snapshot capture."""
 
+import textwrap
 from pathlib import Path
 from uuid import uuid4
 
@@ -40,6 +41,7 @@ def dashboard(
     overlays=True,
     multi=False,
     histories=None,
+    vision=None,
 ) -> np.ndarray:
     frame = frame.copy()
     if privacy_blur:
@@ -134,6 +136,8 @@ def dashboard(
         text(canvas, "IMAGE QUALITY REJECTED", (902, 602), 0.37, COLORS["angry"])
     if multi:
         _multi_panel(canvas, faces, histories or {}, selected_id)
+    if vision is not None:
+        _vision_panel(canvas, vision)
     text(
         canvas,
         "Expression estimates, not a measure of someone's feelings.",
@@ -141,8 +145,52 @@ def dashboard(
         0.47,
         (153, 163, 170),
     )
-    text(canvas, "SPACE Pause  TAB Face  M View  S Save  Q Quit", (685, 696), 0.39)
+    controls = (
+        "A Ask  T Question  V Vision  M Faces  Q Quit"
+        if vision is not None
+        else "SPACE Pause  TAB Face  M View  S Save  Q Quit"
+    )
+    text(canvas, controls, (685, 696), 0.39)
     return canvas
+
+
+def _vision_panel(canvas, state):
+    cv2.rectangle(canvas, (880, 100), (1170, 662), (35, 32, 29), -1)
+    text(canvas, "LOCAL VISION", (902, 132), 0.62, (121, 220, 112))
+    result = state.get("result") or {}
+    editing = state.get("editing")
+    status = (
+        "TYPE / ENTER send / ESC cancel"
+        if editing is not None
+        else "ANALYZING CAPTURED FRAME..."
+        if state.get("busy")
+        else "A ask / T question / V switch"
+    )
+    text(canvas, status, (902, 159), 0.35, (153, 163, 170))
+    question = editing + "_" if editing is not None else state.get("question", "")
+
+    # OpenCV Hershey fonts are ASCII; full Unicode remains intact in API/JSON output.
+    def lines(value, count):
+        value = " ".join(str(value).split()).encode("ascii", "replace").decode()
+        return textwrap.wrap(value, width=32, max_lines=count, placeholder="...")
+
+    for i, line in enumerate(lines(question, 3)):
+        text(canvas, line, (902, 193 + 20 * i), 0.40, (180, 200, 220))
+    if result.get("source_frame") is not None:
+        text(
+            canvas,
+            f"Frame {result['source_frame']} / {result['source_timestamp_seconds']:.1f}s",
+            (902, 266),
+            0.39,
+        )
+    answer = (
+        result.get("answer")
+        or result.get("error")
+        or "Show an object, scene or text, then press A."
+    )
+    for i, line in enumerate(lines(answer, 15)):
+        text(canvas, line, (902, 296 + 21 * i), 0.40)
+    text(canvas, "May be wrong. Check details.", (902, 643), 0.38, (153, 163, 170))
 
 
 def _multi_panel(canvas, faces, histories, selected_id):

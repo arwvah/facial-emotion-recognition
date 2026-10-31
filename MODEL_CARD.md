@@ -1,5 +1,21 @@
 # Pretrained CNN provenance
 
+## Optional scene model (1.1)
+
+The LM Studio integration was exercised with
+[lmstudio-community/Qwen3-VL-2B-Instruct-GGUF](https://huggingface.co/lmstudio-community/Qwen3-VL-2B-Instruct-GGUF),
+Q4_K_M and its vision projector, about 1.93 GB combined according to the local LM Studio inventory.
+The model is provided separately by the user and is not bundled, downloaded or checksum-managed
+by Expression Lab. The repository identifies its license as Apache-2.0. The configured model
+identifier is explicit; no other model or remote provider is substituted.
+
+Inputs are a single resized JPEG plus a question; responses are free text, without calibrated
+confidence or guaranteed object boxes/counts. Default longest side is 768 pixels and output is
+limited to 256 tokens. Small text can be lost during resizing. No face crop or expression score
+is required for scene questions. Answers never replace FER+ probabilities, AU or VA outputs.
+Simple shape/color and text-reading smoke checks passed; no general recognition benchmark or
+claim to recognize everything is made. See [VISION.md](VISION.md).
+
 - **Model:** FER+ Emotion Recognition, `emotion-ferplus-8.onnx`, opset 8.
 - **Maintainer/source:** [ONNX Model Zoo](https://github.com/onnx/models/tree/main/validated/vision/body_analysis/emotion_ferplus).
 - **Original training implementation:** [Microsoft FERPlus](https://github.com/microsoft/FERPlus), CNTK, cross-entropy training.

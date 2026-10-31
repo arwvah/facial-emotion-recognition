@@ -10,6 +10,14 @@ held-out evaluation support that interpretation.
   someone else or storing their identity.
 - Inference uses local model files. Model setup explicitly downloads from pinned upstream URLs;
   normal processing does not download models or upload frames.
+- With `--vision`, selected full frames are JPEG-encoded in memory and sent to LM Studio on
+  an explicit loopback IP. Environment proxies and redirects are disabled. There is no cloud
+  fallback, tool execution, conversation history, or automatic model download. `--privacy-blur`
+  pixelates detected faces before the vision request too. LM Studio is a separate process:
+  its own logging/settings and OS memory/swap are outside this application's no-storage promise.
+- Vision results are displayed/printed, and written only with explicit export options. The
+  `/describe` route requires `vision: true`; it shares the API's token and origin restrictions.
+  Its answers can be wrong, omit text, or hallucinate objects; they are not identity or diagnosis.
 - The API binds to loopback by default and processes encoded frames in memory. It does not
   open the server's camera, persist frames/results, or deliver webhooks. Each WebSocket gets
   separate temporary tracks and bounded recent histories.

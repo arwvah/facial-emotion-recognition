@@ -1,0 +1,10 @@
+# Start LM Studio's server on 127.0.0.1:1234 and load this vision model first.
+vision: true
+vision_model: qwen3-vl-2b-instruct
+vision_url: http://127.0.0.1:1234/v1
+vision_prompt: Describe the main objects and visible scene briefly. Read clearly visible text.
+vision_interval: 0       # 0: press A to ask; positive: seconds between sampled requests
+vision_timeout: 60
+vision_max_tokens: 256
+vision_max_side: 768
+no_storage: true

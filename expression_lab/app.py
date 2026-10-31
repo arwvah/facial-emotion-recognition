@@ -17,6 +17,7 @@ from .configuration import DEFAULTS, PATH_OPTIONS, load_yaml, validate_options
 from .dashboard import WINDOW, dashboard, save_snapshot
 from .emotion import RAW_LABELS, EmotionRecognizer, download_detector, download_model
 from .tracking import select_face
+from .vision import VisionWorker, client_from_args
 
 
 def parse_args(argv=None):
@@ -123,6 +124,7 @@ def parse_args(argv=None):
         args.events_jsonl,
         args.csv,
         args.batch_output,
+        args.vision_jsonl,
     )
     outputs = [p.resolve() for p in export_paths if p]
     if inputs.intersection(outputs) or len(outputs) != len(set(outputs)):
@@ -139,6 +141,9 @@ def run(args):
     from .events import EventDetector, WebhookDispatcher
     from .pipeline import FramePipeline, InferenceWorker
 
+    if args.vision_check:
+        print(json.dumps(client_from_args(args).check(), indent=2))
+        return 0
     if args.setup:
         if args.no_storage:
             raise ValueError("--no-storage forbids model downloads; use preinstalled models")
@@ -155,6 +160,8 @@ def run(args):
         from .batch import process_batch
 
         return process_batch(args)
+    if args.vision and args.headless and not args.image and args.vision_interval == 0:
+        raise ValueError("Headless video/camera vision requires a positive --vision-interval")
     for path in (args.video, args.image):
         if path and not path.is_file():
             raise FileNotFoundError(f"Input file not found: {path}")
@@ -165,6 +172,9 @@ def run(args):
     ):
         raise RuntimeError("No desktop display found. Use --headless to process without a window.")
     recognizer = EmotionRecognizer(args.threshold, args.detector, **recognizer_options(args))
+    vision_client = client_from_args(args) if args.vision else None
+    if vision_client:
+        vision_client.check()
     apply_calibration(recognizer, args)
     pipeline = FramePipeline(
         recognizer,
@@ -201,6 +211,7 @@ def run(args):
                 source_fps = 25.0
         log = _open_export(stack, args.jsonl)
         event_log = _open_export(stack, args.events_jsonl)
+        vision_log = _open_export(stack, args.vision_jsonl)
         csv_log = _open_export(stack, args.csv)
         csv_writer = None
         if csv_log:
@@ -232,6 +243,39 @@ def run(args):
         worker = InferenceWorker(pipeline) if args.async_pipeline else None
         if worker:
             stack.callback(worker.close)
+        vision_worker = VisionWorker(vision_client) if vision_client else None
+        if vision_worker:
+            stack.callback(vision_worker.close)
+        vision_result = None
+        vision_visible = bool(vision_client)
+        vision_question = args.vision_prompt
+        editing_question = None
+        last_vision_time = -float("inf")
+        vision_failed = False
+
+        def accept_vision(result):
+            nonlocal vision_failed
+            if result is not None:
+                vision_failed = vision_failed or result.get("status") == "error"
+                if vision_log:
+                    vision_log.write(json.dumps(result, allow_nan=False) + "\n")
+                    vision_log.flush()
+                if not args.image or not args.headless:
+                    print(
+                        json.dumps({"type": "vision_result", **result}, allow_nan=False), flush=True
+                    )
+            return result
+
+        def vision_view():
+            if not vision_visible:
+                return None
+            return {
+                "result": vision_result,
+                "question": vision_question,
+                "editing": editing_question,
+                "busy": bool(vision_worker and vision_worker.pending is not None),
+            }
+
         writer = None
         frames, face_count = 0, 0
         start = time.perf_counter()
@@ -245,6 +289,10 @@ def run(args):
         source_title = f"{source_name} / {args.detector.upper()}"
         while True:
             loop_start = time.perf_counter()
+            if vision_worker:
+                completed = vision_worker.poll()
+                if completed is not None:
+                    vision_result = accept_vision(completed)
             new_frame = not paused or frames == 0
             if new_frame:
                 if prefetched is not None:
@@ -283,6 +331,24 @@ def run(args):
                 face_count += len(faces)
                 emitted = events.update(faces, timestamp)
                 analytics.update(faces, timestamp, emitted)
+                if (
+                    vision_worker
+                    and editing_question is None
+                    and (
+                        args.image
+                        or (
+                            args.vision_interval > 0
+                            and timestamp - last_vision_time >= args.vision_interval
+                        )
+                    )
+                ):
+                    vision_input = dashboard(
+                        frame, faces, 0, overlays=False, privacy_blur=args.privacy_blur
+                    )
+                    if vision_worker.submit(vision_input, vision_question, frames, timestamp):
+                        last_vision_time = timestamp
+                    if args.image and args.headless:
+                        vision_result = accept_vision(vision_worker.poll(wait=True))
                 record = {
                     "schema_version": 3,
                     "frame": frames,
@@ -299,6 +365,8 @@ def run(args):
                     "consent_acknowledged": args.consent_ack,
                     "faces": [face.as_dict() for face in faces],
                 }
+                if args.vision:
+                    record["vision"] = vision_result
                 # At most one future frame: worker inference overlaps rendering/export of this frame.
                 if worker and image is None and not (args.max_frames and frames >= args.max_frames):
                     assert capture is not None
@@ -324,6 +392,7 @@ def run(args):
                     overlays=args.overlays,
                     multi=multi,
                     histories=analytics.tracks,
+                    vision=vision_view(),
                 )
                 if log:
                     log.write(json.dumps(record, allow_nan=False) + "\n")
@@ -378,6 +447,7 @@ def run(args):
                     overlays=args.overlays,
                     multi=multi,
                     histories=analytics.tracks,
+                    vision=vision_view(),
                 )
                 cv2.imshow(WINDOW, shown)
                 elapsed_ms = (time.perf_counter() - loop_start) * 1000
@@ -389,6 +459,28 @@ def run(args):
                     else 1
                 )
                 key = cv2.waitKey(delay) & 0xFF
+                if editing_question is not None:
+                    if key == 27:
+                        editing_question = None
+                    elif key in (10, 13) and editing_question.strip():
+                        vision_question = editing_question.strip()
+                        editing_question = None
+                        if vision_worker:
+                            submitted = vision_worker.submit(
+                                dashboard(
+                                    frame, faces, 0, overlays=False, privacy_blur=args.privacy_blur
+                                ),
+                                vision_question,
+                                frames,
+                                timestamp,
+                            )
+                            if submitted:
+                                vision_result = None
+                    elif key in (8, 127):
+                        editing_question = editing_question[:-1]
+                    elif 32 <= key <= 126 and len(editing_question) < 2048:
+                        editing_question += chr(key)
+                    continue
                 if key in (ord("q"), ord("Q"), 27):
                     break
                 if key == 32 and image is None:
@@ -397,6 +489,22 @@ def run(args):
                     selected_id = select_face(faces, selected_id, cycle=True)
                 elif key in (ord("m"), ord("M")):
                     multi = not multi
+                    vision_visible = False
+                elif key in (ord("v"), ord("V")) and vision_worker:
+                    vision_visible = not vision_visible
+                elif key in (ord("a"), ord("A")) and vision_worker:
+                    vision_visible = True
+                    vision_worker.submit(
+                        dashboard(frame, faces, 0, overlays=False, privacy_blur=args.privacy_blur),
+                        vision_question,
+                        frames,
+                        timestamp,
+                    )
+                elif (
+                    key in (ord("t"), ord("T")) and vision_worker and vision_worker.pending is None
+                ):
+                    vision_visible = True
+                    editing_question = ""
                 elif key in (ord("s"), ord("S")):
                     if args.no_storage:
                         print("Snapshot disabled by --no-storage", file=sys.stderr)
@@ -414,13 +522,15 @@ def run(args):
                 args.max_frames and frames >= args.max_frames
             ):
                 break
+        if vision_worker and vision_worker.pending is not None:
+            vision_result = accept_vision(vision_worker.poll(wait=True))
         if args.report:
             analytics.write_report(args.report)
         print(
             f"Processed {frames} frame(s), {face_count} face detection(s) in {time.perf_counter() - start:.2f}s.",
             file=sys.stderr,
         )
-    return 0
+    return 1 if vision_failed else 0
 
 
 def _open_export(stack, path):

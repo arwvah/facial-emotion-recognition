@@ -6,6 +6,17 @@ with YuNet, then runs the pretrained FER+ CNN. Version **1.0** adds image-qualit
 alignment, augmentation, calibration tooling, timelines/reports, batch mode, a local API,
 model adapters, performance options, and installable CLI commands.
 
+Version **1.1** adds **local scene understanding with LM Studio**: ask about objects, visible
+text, and scenes using Qwen3-VL. Press **A** to analyze the current frame, **T** to enter a
+question, and **V** to switch the vision panel. This complements the expression CNN and works
+when there are no faces. [Local vision setup and usage](VISION.md).
+
+```bash
+# After loading Qwen3-VL and starting LM Studio's local server:
+./run-vision.sh --vision-check
+./run-vision.sh --no-storage
+```
+
 Expression estimates describe visible patterns, not someone's feelings. Obtain consent before
 processing people. [Feature status](FEATURES.md) · [Privacy](PRIVACY.md) · [Model card](MODEL_CARD.md)
 · [Development/evaluation](DEVELOPMENT.md) · [Verification](VERIFICATION.md).

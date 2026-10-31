@@ -1,6 +1,35 @@
 # Verification — 2026-10-31
 
-## Current release: 1.0
+## Current release: 1.1 — LM Studio vision
+
+- Confirmed the downloaded LM Studio model is Qwen3-VL 2B Instruct Q4_K_M with vision support,
+  about 1.93 GB including its projector. Started the API on `127.0.0.1:1234` and used the working
+  local `qwen3-vl-2b-instruct` instance. Temporary duplicate test instances were unloaded. Initial
+  duplicate GPU-load attempts failed on memory allocation; the existing working model was retained.
+- Actual image questions passed through the new client, integrated headless CLI and `/describe`
+  API: a generated card was described as a red circle and blue square, and a focused transcription
+  request returned `LOCAL VISION 42`. A combined question omitted the text, demonstrating that
+  answers are not exhaustive. No test result establishes general recognition accuracy.
+- Visually inspected `outputs/vision-test-preview.png`. The panel shows the question, answer,
+  source frame/time and controls. The original eight-class expression behavior remains available.
+- Processed the actual 24-frame video fixture with sampled vision and retained all 36 face
+  detections. Two completed descriptions identify source frames 1 and 23; the final in-flight
+  response was printed and exported after video EOF. Sampling drops busy intervals by design.
+- **72 tests passed**, including real loopback HTTP image transport, image resizing/color,
+  proxy bypass, redirect/remote rejection, request bounds, model availability, malformed results,
+  single-request concurrency, capture identity, no-storage, error exit codes, question typing,
+  and API authentication/disabled/busy behavior. Tests require no LM Studio installation or weights.
+- Ruff and formatting passed; mypy passed all **18 implementation modules**. The upstream
+  Starlette/httpx test-client deprecation warning remains non-fatal.
+- Built version 1.1 wheel/sdist and checked inclusion of the vision module, launcher, config and
+  documentation. Installed the wheel into a clean temporary environment outside the checkout;
+  actual LM Studio image inference passed under `--no-storage`, with no output files created.
+
+Physical webcam use and broad object/OCR accuracy remain untested. LM Studio runtime logging is
+outside the application's no-storage control. The vision model does not supply calibrated
+confidence, object boxes, reliable identity, feelings, AU or VA outputs. See VISION.md.
+
+## Release 1.0
 
 - **61 tests passed**, including REST/WebSocket contracts, real synthetic ONNX execution,
   alignment, quality rejection, temperature fitting, data-split checks, analytics, events,

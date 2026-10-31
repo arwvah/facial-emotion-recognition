@@ -1,4 +1,5 @@
 include README.md MODEL_CARD.md FEATURES.md PRIVACY.md DEVELOPMENT.md VERIFICATION.md
+include VISION.md vision.example.yaml run-vision.sh
 include config.example.yaml benchmark.example.json model.ferplus.json auxiliary.example.json
 include requirements-api.txt uv.lock run.sh Dockerfile .dockerignore .python-version
 include app.py emotion.py tracking.py dashboard.py diagnostics.py labels.py backends.py quality.py configuration.py pipeline.py analytics.py events.py batch.py service.py evaluation.py optimization.py

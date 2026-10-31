@@ -30,3 +30,7 @@ event_seconds: 2
 event_confidence: 0.7
 event_cooldown: 10
 webhook: null
+vision: false          # Opt-in LM Studio scene understanding; see vision.example.yaml
+vision_model: qwen3-vl-2b-instruct
+vision_url: http://127.0.0.1:1234/v1
+vision_interval: 0     # Press A to ask; positive seconds enable automatic sampling

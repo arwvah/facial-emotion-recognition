@@ -7,8 +7,19 @@ from pathlib import Path
 import yaml
 
 from .labels import RAW_LABELS
+from .vision import DEFAULT_PROMPT, client_from_args, validate_prompt
 
 DEFAULTS = {
+    "vision": False,
+    "vision_check": False,
+    "vision_url": "http://127.0.0.1:1234/v1",
+    "vision_model": "qwen3-vl-2b-instruct",
+    "vision_prompt": DEFAULT_PROMPT,
+    "vision_interval": 0.0,
+    "vision_timeout": 60.0,
+    "vision_max_tokens": 256,
+    "vision_max_side": 768,
+    "vision_jsonl": None,
     "temperature": 1.0,
     "align": True,
     "tta": False,
@@ -44,6 +55,7 @@ DEFAULTS = {
     "csv": None,
 }
 PATH_OPTIONS = {
+    "vision_jsonl",
     "video",
     "image",
     "output",
@@ -59,6 +71,8 @@ PATH_OPTIONS = {
     "csv",
 }
 BOOL_OPTIONS = {
+    "vision",
+    "vision_check",
     "align",
     "tta",
     "async_pipeline",
@@ -92,6 +106,19 @@ def load_yaml(path: Path, allowed: set[str]) -> dict:
 
 
 def validate_options(args):
+    client_from_args(args)  # Validates settings without connecting to LM Studio.
+    validate_prompt(args.vision_prompt)
+    if (
+        isinstance(args.vision_interval, bool)
+        or not isinstance(args.vision_interval, (int, float))
+        or not math.isfinite(args.vision_interval)
+        or args.vision_interval < 0
+    ):
+        raise ValueError("vision-interval must be a finite nonnegative number of seconds")
+    if args.vision_jsonl and not args.vision:
+        raise ValueError("--vision-jsonl requires --vision")
+    if args.vision and args.batch:
+        raise ValueError("Vision supports image/video/camera input; batch mode is expression-only")
     if isinstance(args.camera, bool) or not isinstance(args.camera, int) or args.camera < 0:
         raise ValueError("camera must be a nonnegative integer")
     if args.max_frames is not None and (
@@ -139,7 +166,15 @@ def validate_options(args):
         raise ValueError("Use either --calibration or --temperature")
     if args.no_storage and any(
         getattr(args, key)
-        for key in ("output", "jsonl", "report", "events_jsonl", "csv", "batch_output")
+        for key in (
+            "output",
+            "jsonl",
+            "report",
+            "events_jsonl",
+            "csv",
+            "batch_output",
+            "vision_jsonl",
+        )
     ):
         raise ValueError("--no-storage forbids file export/report flags")
     if args.webhook and args.local_only:

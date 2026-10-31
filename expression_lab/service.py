@@ -20,7 +20,7 @@ def decode_frame(data: bytes):
     return frame
 
 
-def create_app(config=None, recognizer_factory=None):
+def create_app(config=None, recognizer_factory=None, vision_factory=None):
     try:
         from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
     except ImportError as exc:
@@ -30,6 +30,7 @@ def create_app(config=None, recognizer_factory=None):
     from .configuration import apply_calibration, recognizer_options
     from .emotion import EmotionRecognizer
     from .pipeline import FramePipeline
+    from .vision import VisionBusy, client_from_args
 
     args = parse_args(
         (["--config", str(config)] if config else []) + ["--headless", "--no-storage"]
@@ -39,9 +40,12 @@ def create_app(config=None, recognizer_factory=None):
     token = os.environ.get("EXPRESSION_LAB_API_TOKEN", "")
     model = None
     model_lock = threading.Lock()
+    vision_client = (
+        (vision_factory() if vision_factory else client_from_args(args)) if args.vision else None
+    )
     app = FastAPI(
         title="Expression Lab local inference",
-        version="1.0.0",
+        version="1.1.0",
         description="Local expression estimates, not feelings. Obtain consent before submitting images. Frames are processed in memory; no image storage or webhooks.",
     )
 
@@ -104,6 +108,8 @@ def create_app(config=None, recognizer_factory=None):
             "alignment": args.align,
             "tta": args.tta,
             "auxiliary_configured": bool(args.auxiliary),
+            "vision_enabled": args.vision,
+            "vision_model": args.vision_model if args.vision else None,
             "notice": "Visible expression estimates, not feelings. Obtain consent before submitting images.",
         }
 
@@ -122,6 +128,39 @@ def create_app(config=None, recognizer_factory=None):
             raise HTTPException(422, str(exc)) from exc
         except (OSError, RuntimeError) as exc:
             raise HTTPException(503, "Model unavailable; run --check and --setup locally") from exc
+
+    @app.post("/describe")
+    async def describe(request: Request):
+        if not authorized(request.headers) or not origin_allowed(request.headers):
+            raise HTTPException(403, "Access denied")
+        if vision_client is None:
+            raise HTTPException(503, "Vision disabled; enable vision in the server YAML config")
+        try:
+            data = bytearray()
+            async for chunk in request.stream():
+                data.extend(chunk)
+                if len(data) > 8 * 1024 * 1024:
+                    raise HTTPException(413, "Image exceeds 8 MiB")
+            frame = decode_frame(bytes(data))
+            if args.privacy_blur:
+                from .dashboard import dashboard
+
+                def blur():
+                    with model_lock:
+                        faces = get_model().detect(frame)
+                    return dashboard(frame, faces, 0, privacy_blur=True, overlays=False)
+
+                frame = await asyncio.to_thread(blur)
+            prompt = request.query_params.get("question", args.vision_prompt)
+            return await asyncio.to_thread(vision_client.describe, frame, prompt)
+        except VisionBusy as exc:
+            raise HTTPException(429, str(exc)) from exc
+        except (ValueError, cv2.error) as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except (OSError, RuntimeError) as exc:
+            raise HTTPException(
+                503, "Local vision unavailable; check LM Studio model and server"
+            ) from exc
 
     @app.websocket("/ws")
     async def stream(socket: WebSocket):
