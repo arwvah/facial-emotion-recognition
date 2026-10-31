@@ -23,7 +23,19 @@ class VisionTests(unittest.TestCase):
     def setUp(self):
         self.calls = []
         self.reply = {
-            "choices": [{"message": {"content": "A blue square."}, "finish_reason": "stop"}]
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "answer": "A blue square.",
+                                "objects": [{"label": "blue square", "box": [100, 200, 500, 600]}],
+                            }
+                        )
+                    },
+                    "finish_reason": "stop",
+                }
+            ]
         }
         self.status = 200
         owner = self
@@ -66,6 +78,10 @@ class VisionTests(unittest.TestCase):
             result = self.client.describe(self.frame, "What color?")
         self.assertEqual(result["answer"], "A blue square.")
         self.assertEqual(result["input_size_wh"], [224, 112])
+        self.assertEqual(
+            result["objects"], [{"label": "blue square", "box_xyxy": [80, 80, 400, 240]}]
+        )
+        self.assertEqual(result["frame_size_wh"], [800, 400])
         payload = self.calls[0]
         content = payload["messages"][1]["content"]
         self.assertEqual(content[0]["text"], "What color?")
@@ -75,6 +91,20 @@ class VisionTests(unittest.TestCase):
         self.assertGreater(decoded[0, 0, 0], 240)
         self.assertNotIn("tools", payload)
         self.assertFalse(payload["stream"])
+        self.assertEqual(payload["response_format"]["type"], "json_schema")
+
+    def test_text_only_mode_remains_available(self):
+        self.client.boxes = False
+        self.reply["choices"][0]["message"]["content"] = "A blue square."
+        result = self.client.describe(self.frame)
+        self.assertEqual(result["answer"], "A blue square.")
+        self.assertEqual(result["objects"], [])
+        self.assertNotIn("response_format", self.calls[0])
+
+    def test_truncated_grounding_is_rejected(self):
+        self.reply["choices"][0]["finish_reason"] = "length"
+        with self.assertRaisesRegex(RuntimeError, "truncated"):
+            self.client.describe(self.frame)
 
     def test_remote_endpoints_and_redirects_are_rejected(self):
         for url in (

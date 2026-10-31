@@ -11,6 +11,11 @@ text, and scenes using Qwen3-VL. Press **A** to analyze the current frame, **T**
 question, and **V** to switch the vision panel. This complements the expression CNN and works
 when there are no faces. [Local vision setup and usage](VISION.md).
 
+Version **1.2** draws **object rectangles with names below them**. `./run-vision.sh` refreshes
+the model every two seconds when idle; **A** requests an update immediately. Boxes follow
+short-term motion and disappear when tracking fails or they expire. Use `--vision-interval 0`
+for manual requests or `--no-vision-boxes` for text-only answers. Locations are model estimates.
+
 ```bash
 # After loading Qwen3-VL and starting LM Studio's local server:
 ./run-vision.sh --vision-check

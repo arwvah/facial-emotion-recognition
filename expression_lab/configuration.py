@@ -17,7 +17,8 @@ DEFAULTS = {
     "vision_prompt": DEFAULT_PROMPT,
     "vision_interval": 0.0,
     "vision_timeout": 60.0,
-    "vision_max_tokens": 256,
+    "vision_max_tokens": 512,
+    "vision_boxes": True,
     "vision_max_side": 768,
     "vision_jsonl": None,
     "temperature": 1.0,
@@ -71,6 +72,7 @@ PATH_OPTIONS = {
     "csv",
 }
 BOOL_OPTIONS = {
+    "vision_boxes",
     "vision",
     "vision_check",
     "align",

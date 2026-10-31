@@ -14,6 +14,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import cv2
 import numpy as np
 
+from .objects import OBJECT_PROMPT, OBJECT_SCHEMA, parse_objects
+
 DEFAULT_PROMPT = "Describe the main objects and visible scene briefly. Read clearly visible text."
 SYSTEM_PROMPT = (
     "Answer the user's question using only visible evidence in this single image. "
@@ -63,8 +65,9 @@ class VisionClient:
         url="http://127.0.0.1:1234/v1",
         model="qwen3-vl-2b-instruct",
         timeout=60.0,
-        max_tokens=256,
+        max_tokens=512,
         max_side=768,
+        boxes=True,
     ):
         self.url = validate_endpoint(url)
         if not isinstance(model, str) or not model.strip() or len(model) > 256:
@@ -95,6 +98,7 @@ class VisionClient:
             max_side,
         )
         self._lock = threading.Lock()
+        self.boxes = boxes
         # Neither environment proxies nor HTTP redirects may send a frame off this machine.
         self._opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
@@ -168,6 +172,20 @@ class VisionClient:
             if not ok:
                 raise ValueError("Cannot encode vision input")
             uri = "data:image/jpeg;base64," + base64.b64encode(encoded).decode("ascii")
+            response_format = (
+                {
+                    "response_format": {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "scene_objects",
+                            "strict": True,
+                            "schema": OBJECT_SCHEMA,
+                        },
+                    }
+                }
+                if self.boxes
+                else {}
+            )
             data = self._request(
                 "/chat/completions",
                 {
@@ -176,7 +194,10 @@ class VisionClient:
                     "temperature": 0.1,
                     "max_tokens": self.max_tokens,
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "system",
+                            "content": SYSTEM_PROMPT + (OBJECT_PROMPT if self.boxes else ""),
+                        },
                         {
                             "role": "user",
                             "content": [
@@ -185,6 +206,7 @@ class VisionClient:
                             ],
                         },
                     ],
+                    **response_format,
                 },
             )
             try:
@@ -196,6 +218,20 @@ class VisionClient:
                 raise RuntimeError(
                     "Vision model returned no usable answer; check image support"
                 ) from exc
+            objects, rejected = [], 0
+            if self.boxes:
+                if choice.get("finish_reason") == "length":
+                    raise RuntimeError(
+                        "Object response was truncated; increase --vision-max-tokens"
+                    )
+                try:
+                    structured = json.loads(answer)
+                    objects, rejected = parse_objects(structured, width, height)
+                    answer = structured["answer"].strip() or "No description returned."
+                except (ValueError, TypeError) as exc:
+                    raise RuntimeError(
+                        "Vision model returned invalid object JSON; try --no-vision-boxes for text-only models"
+                    ) from exc
             return {
                 "status": "ok",
                 "model": self.model,
@@ -205,6 +241,10 @@ class VisionClient:
                 "input_size_wh": [scaled.shape[1], scaled.shape[0]],
                 "finish_reason": choice.get("finish_reason"),
                 "storage": "memory_only",
+                "frame_size_wh": [width, height],
+                "objects": objects,
+                "objects_rejected": rejected,
+                "object_coordinates": "original_frame_pixels_xyxy",
             }
         finally:
             self._lock.release()
@@ -217,6 +257,7 @@ def client_from_args(args):
         args.vision_timeout,
         args.vision_max_tokens,
         args.vision_max_side,
+        args.vision_boxes,
     )
 
 

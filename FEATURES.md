@@ -1,8 +1,9 @@
-# Feature status — 1.1
+# Feature status — 1.2
 
 | Requested area | Implementation | What remains data/hardware dependent |
 |---|---|---|
 | Local scene understanding | LM Studio Qwen3-VL client; frame questions, text reading, async desktop panel, timed sampling, JSONL and `/describe` API | Compatible local vision model/server; recognition is fallible and not exhaustive |
+| Named object boxes | Up to six model-estimated rectangles, names below boxes, validated coordinates, short-lived optical-flow tracking | Approximate localization; lost/expired tracks disappear; no object-detection accuracy benchmark |
 | Confidence / temperature calibration | Thresholded uncertain output; held-out fitting command; model/contract-bound artifacts | Fit and assess on a labeled, representative calibration/test split |
 | Face alignment | YuNet eye-line rotation and consistent eye positioning; safe crop fallback | Compare accuracy against unaligned input on the intended population |
 | Lighting / quality | Size, brightness and Laplacian sharpness checks; skip/flag reasons | Tune thresholds for the camera/domain |
@@ -22,7 +23,7 @@
 | Skipping / async | Optical flow between detections; optional inference intervals; bounded worker prefetch | Validate missed transients and speed on the target stream |
 | ONNX/OpenVINO / GPU | ONNX input adapters, paired-checksum OpenVINO IR export, provider selection | GPU/provider-specific hardware is not available for validation here |
 | INT8 | Static QDQ candidate conversion, independent test-set accuracy gate, validation manifest | No production INT8 approval without representative calibration/test data |
-| Engineering | 72 passing tests, full-module mypy, lint/format, GitHub Actions workflow | See the repository Actions tab for current hosted status |
+| Engineering | 80 passing tests, full-module mypy, lint/format, GitHub Actions workflow | See the repository Actions tab for current hosted status |
 | Privacy / ethics | Consent notice/ack flag, no automatic inference-time downloads, local defaults, model card | Obtain consent and assess suitability for the actual use case |
 
 There is no default trained AU/VA model, labeled evaluation dataset, or fabricated benchmark.

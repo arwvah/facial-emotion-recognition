@@ -1,6 +1,26 @@
 # Verification — 2026-10-31
 
-## Current release: 1.1 — LM Studio vision
+## Current release: 1.2 — named object boxes
+
+- The real LM Studio Qwen3-VL model returned structured names and normalized object coordinates.
+  The application validated these and mapped them into original-frame pixels. Visually checked
+  `outputs/object-boxes-preview.png`: cyan rectangles surround the test shapes/text, with names
+  below each rectangle. The locations are approximate, not accuracy-certified detections.
+- Real model inference plus a simulated moving frame stream passed: delayed source-frame boxes
+  were replayed through optical flow to frame 32. A 30-pixel image translation moved the red-circle
+  box by 30 pixels and the blue-square box by 32 pixels. Visually checked the resulting
+  `outputs/object-motion-preview.png`; no physical webcam was used for this test.
+- **80 tests passed**, including normalized coordinate mapping, malformed/out-of-range box
+  rejection, truncated structured output, text-only compatibility, delayed-motion replay,
+  disappearance on blank/expired/missing-history/changed-resolution frames, label placement
+  below rectangles, and disabling annotations with `--no-overlays`.
+- Ruff lint/format passed and mypy passed all **19 implementation modules**. The existing
+  upstream Starlette/httpx test-client deprecation warning remains non-fatal.
+- `run-vision.sh` now samples every two seconds when idle. Explicit CLI arguments can override
+  this; box tracking expires after five seconds of source time and stores at most 180 small
+  grayscale frames. No new trained model or dependency was downloaded.
+
+## Release 1.1 — LM Studio vision
 
 - Confirmed the downloaded LM Studio model is Qwen3-VL 2B Instruct Q4_K_M with vision support,
   about 1.93 GB including its projector. Started the API on `127.0.0.1:1234` and used the working

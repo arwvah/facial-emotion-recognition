@@ -16,6 +16,7 @@ import onnxruntime as ort
 from .configuration import DEFAULTS, PATH_OPTIONS, load_yaml, validate_options
 from .dashboard import WINDOW, dashboard, save_snapshot
 from .emotion import RAW_LABELS, EmotionRecognizer, download_detector, download_model
+from .objects import ObjectOverlay
 from .tracking import select_face
 from .vision import VisionWorker, client_from_args
 
@@ -252,10 +253,13 @@ def run(args):
         editing_question = None
         last_vision_time = -float("inf")
         vision_failed = False
+        object_overlay = ObjectOverlay() if vision_client and args.vision_boxes else None
 
         def accept_vision(result):
             nonlocal vision_failed
             if result is not None:
+                if object_overlay:
+                    object_overlay.accept(result)
                 vision_failed = vision_failed or result.get("status") == "error"
                 if vision_log:
                     vision_log.write(json.dumps(result, allow_nan=False) + "\n")
@@ -328,6 +332,8 @@ def run(args):
                         faces = pipeline.process(frame, timestamp)
                 selected_id = select_face(faces, selected_id)
                 frames += 1
+                if object_overlay:
+                    object_overlay.update(frame, frames, timestamp)
                 face_count += len(faces)
                 emitted = events.update(faces, timestamp)
                 analytics.update(faces, timestamp, emitted)
@@ -367,6 +373,7 @@ def run(args):
                 }
                 if args.vision:
                     record["vision"] = vision_result
+                    record["object_overlays"] = object_overlay.objects if object_overlay else []
                 # At most one future frame: worker inference overlaps rendering/export of this frame.
                 if worker and image is None and not (args.max_frames and frames >= args.max_frames):
                     assert capture is not None
@@ -393,6 +400,7 @@ def run(args):
                     multi=multi,
                     histories=analytics.tracks,
                     vision=vision_view(),
+                    objects=object_overlay.objects if object_overlay else [],
                 )
                 if log:
                     log.write(json.dumps(record, allow_nan=False) + "\n")
@@ -448,6 +456,7 @@ def run(args):
                     multi=multi,
                     histories=analytics.tracks,
                     vision=vision_view(),
+                    objects=object_overlay.objects if object_overlay else [],
                 )
                 cv2.imshow(WINDOW, shown)
                 elapsed_ms = (time.perf_counter() - loop_start) * 1000

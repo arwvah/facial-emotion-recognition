@@ -3,8 +3,9 @@ vision: true
 vision_model: qwen3-vl-2b-instruct
 vision_url: http://127.0.0.1:1234/v1
 vision_prompt: Describe the main objects and visible scene briefly. Read clearly visible text.
-vision_interval: 0       # 0: press A to ask; positive: seconds between sampled requests
+vision_interval: 2       # 0: press A to ask; positive: seconds between sampled requests
+vision_boxes: true       # Names below model-estimated object rectangles
 vision_timeout: 60
-vision_max_tokens: 256
+vision_max_tokens: 512
 vision_max_side: 768
 no_storage: true

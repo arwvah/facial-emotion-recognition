@@ -9,9 +9,9 @@ The model is provided separately by the user and is not bundled, downloaded or c
 by Expression Lab. The repository identifies its license as Apache-2.0. The configured model
 identifier is explicit; no other model or remote provider is substituted.
 
-Inputs are a single resized JPEG plus a question; responses are free text, without calibrated
-confidence or guaranteed object boxes/counts. Default longest side is 768 pixels and output is
-limited to 256 tokens. Small text can be lost during resizing. No face crop or expression score
+Inputs are a single resized JPEG plus a question; responses contain a description and up to six
+approximate named boxes, without calibrated confidence or guaranteed localization/counts. Default
+longest side is 768 pixels and output is limited to 512 tokens. Small text can be lost during resizing. No face crop or expression score
 is required for scene questions. Answers never replace FER+ probabilities, AU or VA outputs.
 Simple shape/color and text-reading smoke checks passed; no general recognition benchmark or
 claim to recognize everything is made. See [VISION.md](VISION.md).

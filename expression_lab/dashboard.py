@@ -42,6 +42,7 @@ def dashboard(
     multi=False,
     histories=None,
     vision=None,
+    objects=None,
 ) -> np.ndarray:
     frame = frame.copy()
     if privacy_blur:
@@ -93,6 +94,9 @@ def dashboard(
     height, width = resized.shape[:2]
     left, top = 28 + (824 - width) // 2, 100 + (562 - height) // 2
     canvas[top : top + height, left : left + width] = resized
+    draw_object_boxes(
+        canvas, objects or [], left, top, width, height, frame.shape[1], frame.shape[0]
+    )
 
     cv2.rectangle(canvas, (880, 100), (1170, 662), (35, 32, 29), -1)
     text(canvas, "EXPRESSION SCORES", (902, 132), 0.53)
@@ -152,6 +156,36 @@ def dashboard(
     )
     text(canvas, controls, (685, 696), 0.39)
     return canvas
+
+
+def draw_object_boxes(canvas, objects, left, top, width, height, source_width, source_height):
+    """Draw in the image viewport, with each label just below its rectangle."""
+    color = (235, 211, 91)
+    for obj in objects:
+        x1, y1, x2, y2 = obj["box_xyxy"]
+        x1, x2 = [
+            left + round(max(0, min(source_width, x)) * width / source_width) for x in (x1, x2)
+        ]
+        y1, y2 = [
+            top + round(max(0, min(source_height, y)) * height / source_height) for y in (y1, y2)
+        ]
+        x2, y2 = min(left + width - 1, x2), min(top + height - 1, y2)
+        if x2 <= x1 or y2 <= y1:
+            continue
+        cv2.rectangle(canvas, (x1, y1), (x2, y2), color, 2)
+        label = obj["label"].encode("ascii", "replace").decode()
+        size = 0.48
+        while (
+            len(label) > 1
+            and cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, size, 1)[0][0] > width - 12
+        ):
+            label = label[:-2] + "~"
+        (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, size, 1)
+        lx = min(x1, left + width - tw - 10)
+        # At the image edge keep the name visible against the bottom of its box.
+        ly = min(y2 + th + 9, top + height - baseline - 4)
+        cv2.rectangle(canvas, (lx, ly - th - 5), (lx + tw + 8, ly + baseline + 3), color, -1)
+        text(canvas, label, (lx + 4, ly), size, (22, 20, 18))
 
 
 def _vision_panel(canvas, state):

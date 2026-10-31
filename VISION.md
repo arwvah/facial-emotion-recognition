@@ -34,6 +34,15 @@ References: [model](https://huggingface.co/lmstudio-community/Qwen3-VL-2B-Instru
 
 ## Camera, images and video
 
+Object boxes are enabled by default. The model returns up to six short object names and
+normalized bounding rectangles; the app validates coordinates and draws cyan rectangles with
+names underneath (inside the bottom edge if there is no room below). These are approximate
+model estimates, not a dedicated real-time detector. `--no-vision-boxes` restores text-only output.
+
+The launcher and `vision.example.yaml` sample automatically every two seconds when idle.
+Use `./run-vision.sh --vision-interval 0` for manual A requests only. Plain `./run.sh --vision`
+retains manual sampling unless an interval is specified. No additional model download is needed.
+
 ```bash
 ./run-vision.sh --no-storage
 ./run.sh --config vision.example.yaml
@@ -60,7 +69,7 @@ stdout and optional JSONL preserve the complete response. T is available when no
 
 Images are analyzed once automatically. Interactive image exports should use `--headless` when
 the saved dashboard must include the answer; interactive snapshots use S after the answer arrives.
-Camera/video requests default to A only. Positive `--vision-interval` enables sampling based on
+Positive `--vision-interval` enables sampling based on
 source timestamps, with at most one request in flight. Busy intervals are skipped, not queued;
 fast offline video processing does not guarantee every interval gets analyzed. Image-headless mode
 waits for its answer. Video completion/quit waits for the final in-flight request (bounded by the
@@ -71,6 +80,19 @@ refer to an older frame than the current display. `--jsonl` includes the latest 
 as an optional `vision` field; use `--vision-jsonl` for one record per completed request, including
 final results and errors. Vision text is not merged into expression counts or session reports.
 Batch folder mode remains expression-only and rejects `--vision` rather than silently ignoring it.
+
+Object overlays replay recent optical flow when a delayed response arrives, then follow motion
+between model calls. They disappear after tracking failure, a frame-size change, lost frame
+history, or five seconds of source time. The grayscale history is bounded to 180 frames with
+longest side 384 pixels. Fast/large motion, occlusion, low texture and zoom can lose boxes;
+press A again or wait for the next sample. Turning off overlays removes all rectangles/names.
+
+Results include `objects: [{label, box_xyxy}]` in **original source-frame pixels**,
+`frame_size_wh`, `object_coordinates`, and `objects_rejected`. Invalid/reversed/out-of-range boxes
+are rejected rather than guessed. Per-frame JSONL also has `object_overlays` for the coordinates
+actually displayed on that current frame. Model source boxes remain unchanged. Names do not
+identify a person; no confidence percentage is invented. A truncated structured response fails
+explicitly instead of drawing partial boxes.
 
 ## API
 
@@ -95,9 +117,10 @@ process environment; never put the token in YAML or Git. This is separate from
 
 ## Tuning and privacy
 
-Defaults: `--vision-max-side 768`, `--vision-max-tokens 256`, `--vision-timeout 60`,
-`--vision-interval 0`. Increase image size for small text at the cost of latency/memory. A response
-with `finish_reason: length` was cut off at the generation limit. Model answers have no invented
+Defaults: `--vision-max-side 768`, `--vision-max-tokens 512`, `--vision-timeout 60`,
+`--vision-boxes` enabled. The vision launcher uses `--vision-interval 2`; the core CLI default is 0.
+Increase image size for small text at the cost of latency/memory. Text-only responses
+with `finish_reason: length` were cut off at the generation limit. Model answers have no invented
 confidence percentage. Request errors are visible and headless failures return nonzero.
 
 No images are saved by the vision client. `--no-storage` rejects vision exports too; stdout can

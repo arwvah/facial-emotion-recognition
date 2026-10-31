@@ -45,7 +45,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None):
     )
     app = FastAPI(
         title="Expression Lab local inference",
-        version="1.1.0",
+        version="1.2.0",
         description="Local expression estimates, not feelings. Obtain consent before submitting images. Frames are processed in memory; no image storage or webhooks.",
     )
 
@@ -110,6 +110,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None):
             "auxiliary_configured": bool(args.auxiliary),
             "vision_enabled": args.vision,
             "vision_model": args.vision_model if args.vision else None,
+            "vision_boxes": args.vision and args.vision_boxes,
             "notice": "Visible expression estimates, not feelings. Obtain consent before submitting images.",
         }
 
