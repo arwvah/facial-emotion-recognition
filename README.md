@@ -2,25 +2,31 @@
 
 A local Python application for eight-class facial-expression estimates: **happy, sad, angry,
 neutral, surprise, disgust, fear, and contempt**. It detects faces in webcams, videos, or images
-with YuNet, then runs the pretrained FER+ CNN. Version **1.0** adds image-quality rejection,
-alignment, augmentation, calibration tooling, timelines/reports, batch mode, a local API,
-model adapters, performance options, and installable CLI commands.
+with YuNet and classifies their visible expressions. The standard launcher uses FER+.
+The **1.3 recognition preset** adds:
 
-Version **1.1** adds **local scene understanding with LM Studio**: ask about objects, visible
-text, and scenes using Qwen3-VL. Press **A** to analyze the current frame, **T** to enter a
-question, and **V** to switch the vision panel. This complements the expression CNN and works
-when there are no faces. [Local vision setup and usage](VISION.md).
+- **NanoDet Plus:** fresh named boxes for 80 common object categories on every processed frame.
+- **HSEmotion:** a 224×224 RGB CNN for all eight expressions, with augmentation and ambiguity rejection.
+- **Qwen3-VL in LM Studio:** broader descriptions and approximate boxes for other objects.
+- **R — Inspect:** select a smaller region for a closer look; boxes map back to the full frame.
+- Face-quality guidance for small, dark, overexposed or blurry faces.
 
-Version **1.2** draws **object rectangles with names below them**. `./run-vision.sh` refreshes
-the model every two seconds when idle; **A** requests an update immediately. Boxes follow
-short-term motion and disappear when tracking fails or they expire. Use `--vision-interval 0`
-for manual requests or `--no-vision-boxes` for text-only answers. Locations are model estimates.
+No model recognizes every object reliably. Small, unusual, occluded objects and subtle expressions
+can still be missed or mislabeled. These additions have not been evaluated on your camera or a
+representative labeled dataset. [Model details and limitations](MODEL_CARD.md).
 
 ```bash
-# After loading Qwen3-VL and starting LM Studio's local server:
+./run.sh --setup-recognition    # Explicitly download and verify ~20 MB of additional models
+# Load Qwen3-VL and start LM Studio's local server, then:
 ./run-vision.sh --vision-check
 ./run-vision.sh --no-storage
+# Object boxes + expressions without LM Studio:
+./run.sh --object-detector nanodet --expression-model hsemotion --no-align --tta \
+  --expression-margin 0.08 --face-detector-size 960 --no-storage
 ```
+
+Press **A** to ask, **R** to inspect a region, **T** to change the question, **V** for the vision
+panel, and **M** for facial-expression histories. [Local vision setup and usage](VISION.md).
 
 Expression estimates describe visible patterns, not someone's feelings. Obtain consent before
 processing people. [Feature status](FEATURES.md) · [Privacy](PRIVACY.md) · [Model card](MODEL_CARD.md)

@@ -23,12 +23,15 @@ def intersection_over_union(a, b) -> float:
 
 
 class ExpressionTracker:
-    def __init__(self, threshold=0.5, smoothing=0.25, min_overlap=0.3):
+    def __init__(self, threshold=0.5, smoothing=0.25, min_overlap=0.3, margin=0.0):
         if not 0 <= threshold <= 1 or not math.isfinite(smoothing) or smoothing < 0:
             raise ValueError("Invalid threshold or smoothing time.")
         if not 0 < min_overlap <= 1:
             raise ValueError("Overlap threshold must be in (0,1].")
         self.threshold = threshold
+        if not 0 <= margin <= 1:
+            raise ValueError("Expression margin must be in [0,1]")
+        self.margin = margin
         self.smoothing = smoothing
         self.min_overlap = min_overlap
         self.tracks = {}
@@ -71,7 +74,7 @@ class ExpressionTracker:
                 track_id = self.next_id
                 self.next_id += 1
                 scores = raw
-            label, confidence = classify(scores, self.threshold)
+            label, confidence = classify(scores, self.threshold, self.margin)
             if rejected:
                 label = "uncertain"
             updated[track_id] = (face.box, scores, timestamp)
@@ -85,6 +88,8 @@ class ExpressionTracker:
                     raw_probabilities=dict(face.probabilities),
                     uncertainty_reason="image_quality"
                     if rejected
+                    else "ambiguous_expression"
+                    if label == "uncertain" and confidence >= self.threshold
                     else "low_confidence"
                     if label == "uncertain"
                     else None,

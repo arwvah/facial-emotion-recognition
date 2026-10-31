@@ -1,7 +1,7 @@
 # Local vision with LM Studio
 
 Ask about objects, scenes and visible text using the full camera frame. Expression Lab keeps
-its existing expression CNN and runs the vision-language model separately. Answers can be
+a separate expression CNN and runs the vision-language model separately. Answers can be
 incomplete or wrong; this is not exhaustive object detection, identity recognition or emotion
 measurement. The application never runs instructions returned by the model.
 
@@ -34,14 +34,24 @@ References: [model](https://huggingface.co/lmstudio-community/Qwen3-VL-2B-Instru
 
 ## Camera, images and video
 
-Object boxes are enabled by default. The model returns up to six short object names and
-normalized bounding rectangles; the app validates coordinates and draws cyan rectangles with
-names underneath (inside the bottom edge if there is no room below). These are approximate
-model estimates, not a dedicated real-time detector. `--no-vision-boxes` restores text-only output.
+Run `./run.sh --setup-recognition` once before using the enhanced launcher. It downloads
+checksum-pinned NanoDet Plus (~3.8 MB), HSEmotion (~16 MB), and YuNet if missing. No weights are
+bundled or downloaded during inference. `./run-vision.sh --check` verifies the selected assets.
 
-The launcher and `vision.example.yaml` sample automatically every two seconds when idle.
-Use `./run-vision.sh --vision-interval 0` for manual A requests only. Plain `./run.sh --vision`
-retains manual sampling unless an interval is specified. No additional model download is needed.
+The launcher enables a two-part object path: NanoDet detects 80 COCO categories on every
+processed frame; Qwen describes the scene and locates up to six additional regions. Fresh
+NanoDet geometry wins when boxes overlap substantially. Other Qwen regions remain visible and
+use the existing short-term optical-flow tracking. Neither path guarantees exhaustive recognition.
+Names appear below cyan rectangles, or inside the bottom edge when space is tight.
+
+The launcher and `vision.example.yaml` also select HSEmotion with RGB224 preprocessing,
+three-view augmentation, an 0.08 top-two score margin, and a 960-pixel face-detection limit.
+HSEmotion uses unaligned bounding crops to match the author's preprocessing. Plain `./run.sh`
+retains FER+ and its existing defaults. These presets are starting points, not calibrated settings.
+
+Qwen samples every two seconds when idle. Use `--vision-interval 0` for manual requests.
+`--no-vision-boxes` disables Qwen boxes; `--object-detector none` disables NanoDet boxes.
+`--no-overlays` hides all annotations. Both object paths work independently of the vision panel.
 
 ```bash
 ./run-vision.sh --no-storage
@@ -58,10 +68,17 @@ retains manual sampling unless an interval is specified. No additional model dow
 | Key | Action |
 |---|---|
 | A | Capture and ask about the current frame |
+| R | Inspect a region: drag a box, Enter/Space confirms, C cancels; available when idle |
 | T | Type a new question; Enter submits, Escape cancels |
 | V | Toggle the local vision panel |
 | M | Show the existing multi-face panel |
 | Space / Tab / S / Q | Existing pause, select face, snapshot and quit controls |
+
+For small electronics, tools, labels or unusual objects, press R and draw tightly around the
+object. This sends the original-resolution crop to Qwen without the surrounding clutter.
+Results carry `region_xywh` and coordinates translated into the original full frame. Inspection
+is a one-shot request; automatic full-frame sampling resumes afterward. It improves the input
+view but cannot add knowledge the model lacks.
 
 Typing uses printable ASCII in the OpenCV window. CLI/API questions and JSON answers support
 Unicode; the desktop font replaces unsupported characters. Long answers are shortened on screen;
@@ -91,7 +108,9 @@ Results include `objects: [{label, box_xyxy}]` in **original source-frame pixels
 `frame_size_wh`, `object_coordinates`, and `objects_rejected`. Invalid/reversed/out-of-range boxes
 are rejected rather than guessed. Per-frame JSONL also has `object_overlays` for the coordinates
 actually displayed on that current frame. Model source boxes remain unchanged. Names do not
-identify a person; no confidence percentage is invented. A truncated structured response fails
+identify a person; Qwen confidence percentages are not invented. NanoDet results include its
+raw confidence score and `source: nanodet`; retained Qwen overlays have `source: qwen`.
+Detector scores are not calibrated probabilities of correctness. A truncated structured response fails
 explicitly instead of drawing partial boxes.
 
 ## API
@@ -106,7 +125,8 @@ curl -X POST 'http://127.0.0.1:8000/describe?question=What%20is%20visible%3F' \
 parameter. Requests are capped at 8 MiB and four megapixels, questions at 2048 characters. This
 route is disabled unless `vision: true`. It uses the same API bearer-token/origin checks, returns
 429 while a vision request is busy, 422 for invalid input, and 503 if LM Studio is unavailable.
-`/analyze` and `/ws` keep their expression behavior. `/capabilities` reports vision configuration.
+`/analyze` and `/ws` return expression results plus `objects` from NanoDet when enabled.
+`/describe` returns Qwen results; the API does not fuse these separate requests. `/capabilities` reports vision configuration.
 When face privacy blur is disabled, `/describe` does not load or require the expression CNN.
 
 The LM Studio endpoint must use the literal loopback IP `127.0.0.1` or `[::1]` and an explicit
@@ -117,7 +137,7 @@ process environment; never put the token in YAML or Git. This is separate from
 
 ## Tuning and privacy
 
-Defaults: `--vision-max-side 768`, `--vision-max-tokens 512`, `--vision-timeout 60`,
+Core defaults: `--vision-max-side 768` (1024 in the enhanced launcher), `--vision-max-tokens 512`, `--vision-timeout 60`,
 `--vision-boxes` enabled. The vision launcher uses `--vision-interval 2`; the core CLI default is 0.
 Increase image size for small text at the cost of latency/memory. Text-only responses
 with `finish_reason: length` were cut off at the generation limit. Model answers have no invented

@@ -13,6 +13,8 @@ class FramePipeline:
     def __init__(self, recognizer, smoothing=0.25, min_overlap=0.3, detect_every=1, infer_every=1):
         self.recognizer = recognizer
         self.tracker = ExpressionTracker(recognizer.threshold, smoothing, min_overlap)
+        margin = getattr(recognizer, "expression_margin", 0.0)
+        self.tracker.margin = margin if isinstance(margin, (int, float)) else 0.0
         self.detect_every, self.infer_every = detect_every, infer_every
         self.index = 0
         self.previous_gray = None

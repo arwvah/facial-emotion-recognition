@@ -94,8 +94,8 @@ def parse_args(argv=None):
         parser.error("--threshold must be between 0 and 1")
     if not math.isfinite(args.smoothing) or args.smoothing < 0:
         parser.error("--smoothing must be a finite nonnegative number")
-    if args.setup and args.check:
-        parser.error("--setup and --check are separate actions")
+    if sum((args.setup, args.setup_recognition, args.check, args.vision_check)) > 1:
+        parser.error("Setup and diagnostic flags are separate actions")
     if args.camera < 0:
         parser.error("--camera must be nonnegative")
     if args.max_frames is not None and args.max_frames < 1:
@@ -145,6 +145,14 @@ def run(args):
     if args.vision_check:
         print(json.dumps(client_from_args(args).check(), indent=2))
         return 0
+    if args.setup_recognition:
+        from .recognition_models import setup_recognition
+
+        if args.no_storage:
+            raise ValueError("--no-storage forbids model downloads; use preinstalled models")
+        for path in setup_recognition():
+            print(f"Model ready: {path}")
+        return 0
     if args.setup:
         if args.no_storage:
             raise ValueError("--no-storage forbids model downloads; use preinstalled models")
@@ -154,7 +162,7 @@ def run(args):
     if args.check:
         from .diagnostics import system_report
 
-        report = system_report(args.detector)
+        report = system_report(args.detector, args.expression_model, args.object_detector)
         print(json.dumps(report, indent=2))
         return 0 if report["ready"] else 1
     if args.batch:
@@ -173,6 +181,11 @@ def run(args):
     ):
         raise RuntimeError("No desktop display found. Use --headless to process without a window.")
     recognizer = EmotionRecognizer(args.threshold, args.detector, **recognizer_options(args))
+    from .object_detector import ObjectDetector, merge_objects
+
+    object_detector = (
+        ObjectDetector(args.object_threshold) if args.object_detector == "nanodet" else None
+    )
     vision_client = client_from_args(args) if args.vision else None
     if vision_client:
         vision_client.check()
@@ -254,6 +267,10 @@ def run(args):
         last_vision_time = -float("inf")
         vision_failed = False
         object_overlay = ObjectOverlay() if vision_client and args.vision_boxes else None
+        detected_objects: list[dict] = []
+
+        def display_objects():
+            return merge_objects(detected_objects, object_overlay.objects if object_overlay else [])
 
         def accept_vision(result):
             nonlocal vision_failed
@@ -334,6 +351,7 @@ def run(args):
                 frames += 1
                 if object_overlay:
                     object_overlay.update(frame, frames, timestamp)
+                detected_objects = object_detector.detect(frame) if object_detector else []
                 face_count += len(faces)
                 emitted = events.update(faces, timestamp)
                 analytics.update(faces, timestamp, emitted)
@@ -362,6 +380,11 @@ def run(args):
                     "frame_size_wh": [frame.shape[1], frame.shape[0]],
                     "detector": args.detector,
                     "engine": args.engine,
+                    "expression_model": "custom" if args.model_spec else args.expression_model,
+                    "expression_margin": args.expression_margin,
+                    "object_detector": args.object_detector,
+                    "detected_objects": detected_objects,
+                    "object_overlays": display_objects(),
                     "smoothing_seconds": pipeline.tracker.smoothing,
                     "temperature": recognizer.temperature,
                     "detection_ran": pipeline.last_detection,
@@ -373,7 +396,6 @@ def run(args):
                 }
                 if args.vision:
                     record["vision"] = vision_result
-                    record["object_overlays"] = object_overlay.objects if object_overlay else []
                 # At most one future frame: worker inference overlaps rendering/export of this frame.
                 if worker and image is None and not (args.max_frames and frames >= args.max_frames):
                     assert capture is not None
@@ -400,7 +422,7 @@ def run(args):
                     multi=multi,
                     histories=analytics.tracks,
                     vision=vision_view(),
-                    objects=object_overlay.objects if object_overlay else [],
+                    objects=display_objects(),
                 )
                 if log:
                     log.write(json.dumps(record, allow_nan=False) + "\n")
@@ -456,7 +478,7 @@ def run(args):
                     multi=multi,
                     histories=analytics.tracks,
                     vision=vision_view(),
-                    objects=object_overlay.objects if object_overlay else [],
+                    objects=display_objects(),
                 )
                 cv2.imshow(WINDOW, shown)
                 elapsed_ms = (time.perf_counter() - loop_start) * 1000
@@ -509,6 +531,21 @@ def run(args):
                         frames,
                         timestamp,
                     )
+                elif (
+                    key in (ord("r"), ord("R")) and vision_worker and vision_worker.pending is None
+                ):
+                    vision_visible = True
+                    inspection = dashboard(
+                        frame, faces, 0, overlays=False, privacy_blur=args.privacy_blur
+                    )
+                    title = "Inspect object: drag a box, ENTER confirms, C cancels"
+                    region = tuple(map(int, cv2.selectROI(title, inspection, fromCenter=False)))
+                    cv2.destroyWindow(title)
+                    if region[2] > 0 and region[3] > 0:
+                        vision_worker.submit(
+                            inspection, vision_question, frames, timestamp, region=region
+                        )
+                        last_vision_time = timestamp
                 elif (
                     key in (ord("t"), ord("T")) and vision_worker and vision_worker.pending is None
                 ):

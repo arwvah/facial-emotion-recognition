@@ -270,10 +270,19 @@ class VisionWorker:
         self.pending: Future | None = None
         self.context: dict = {}
 
-    def submit(self, frame, prompt, frame_number, timestamp):
+    def submit(self, frame, prompt, frame_number, timestamp, region=None):
         if self.pending is not None:
             return False
         self.context = {"source_frame": frame_number, "source_timestamp_seconds": timestamp}
+        if region is not None:
+            x, y, w, h = region
+            height, width = frame.shape[:2]
+            if any(isinstance(v, bool) or not isinstance(v, int) for v in region) or not (
+                0 <= x < x + w <= width and 0 <= y < y + h <= height
+            ):
+                raise ValueError("Inspection region must be inside the source frame")
+            self.context.update(region_xywh=list(region), frame_size_wh=[width, height])
+            frame = frame[y : y + h, x : x + w]
         self.pending = self.executor.submit(self.client.describe, frame.copy(), prompt)
         return True
 
@@ -283,6 +292,23 @@ class VisionWorker:
         future, self.pending = self.pending, None
         try:
             result = future.result()
+            if result.get("status") == "ok" and "region_xywh" in self.context:
+                x, y, _, _ = self.context["region_xywh"]
+                result = {
+                    **result,
+                    "objects": [
+                        {
+                            **obj,
+                            "box_xyxy": [
+                                obj["box_xyxy"][0] + x,
+                                obj["box_xyxy"][1] + y,
+                                obj["box_xyxy"][2] + x,
+                                obj["box_xyxy"][3] + y,
+                            ],
+                        }
+                        for obj in result.get("objects", [])
+                    ],
+                }
         except (RuntimeError, ValueError, cv2.error) as exc:
             result = {"status": "error", "error": str(exc), "model": self.client.model}
         return {**result, **self.context}

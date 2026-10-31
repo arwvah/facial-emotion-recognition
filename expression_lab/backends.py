@@ -40,6 +40,7 @@ class ModelSpec:
     output: str | None = None
     probabilities: bool = False
     weights_sha256: str | None = None
+    interpolation: str = "area"
 
     @classmethod
     def load(cls, manifest: Path):
@@ -56,6 +57,8 @@ class ModelSpec:
         return spec
 
     def validate(self):
+        if self.interpolation not in ("area", "linear"):
+            raise ValueError("Model interpolation must be area or linear")
         if (
             self.color not in ("gray", "rgb", "bgr")
             or not 8 <= self.width <= 1024
@@ -93,7 +96,11 @@ class ModelSpec:
             crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
         if self.color == "rgb":
             crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-        image = cv2.resize(crop, (self.width, self.height), interpolation=cv2.INTER_AREA)
+        image = cv2.resize(
+            crop,
+            (self.width, self.height),
+            interpolation=cv2.INTER_LINEAR if self.interpolation == "linear" else cv2.INTER_AREA,
+        )
         if image.ndim == 2:
             image = image[:, :, None]
         normalized = (
@@ -103,6 +110,7 @@ class ModelSpec:
 
     def signature(self) -> dict:
         return {
+            **({"interpolation": self.interpolation} if self.interpolation != "area" else {}),
             "sha256": self.sha256,
             "labels": list(self.labels),
             "width": self.width,

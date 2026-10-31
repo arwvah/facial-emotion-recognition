@@ -7,5 +7,12 @@ vision_interval: 2       # 0: press A to ask; positive: seconds between sampled 
 vision_boxes: true       # Names below model-estimated object rectangles
 vision_timeout: 60
 vision_max_tokens: 512
-vision_max_side: 768
+vision_max_side: 1024
+object_detector: nanodet
+object_threshold: 0.4
+expression_model: hsemotion
+expression_margin: 0.08
+face_detector_size: 960
+align: false           # Match HSEmotion's original bounding-crop preprocessing
+tta: true
 no_storage: true

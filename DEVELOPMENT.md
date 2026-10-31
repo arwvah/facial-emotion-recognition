@@ -148,3 +148,13 @@ changes with `uv export --locked --extra api --no-dev --no-emit-project --format
 --output-file requirements-api.txt`. Docker build/run could not be tested locally because access
 to the daemon is denied and passwordless sudo is unavailable. Wheel installation and API/CLI
 checks are verified independently.
+
+## Comparing the new expression model
+
+`./run.sh --setup-recognition` installs the pinned HSEmotion weights. Use
+`expression-lab-evaluate evaluate --expression-model hsemotion --no-align --tta
+--expression-margin 0.08 --manifest dataset.csv --output outputs/hse-metrics.json`
+(on one shell line). The comparison example includes HSEmotion alongside FER+ backends.
+Use the same held-out images and thresholds, report coverage as well as accuracy, and
+fit separate temperature artifacts for each model/preprocessing configuration. The
+recognition preset's 0.08 margin is a heuristic, not a fitted calibration value.

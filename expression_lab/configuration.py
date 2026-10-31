@@ -10,6 +10,12 @@ from .labels import RAW_LABELS
 from .vision import DEFAULT_PROMPT, client_from_args, validate_prompt
 
 DEFAULTS = {
+    "setup_recognition": False,
+    "expression_model": "ferplus",
+    "expression_margin": 0.0,
+    "face_detector_size": 640,
+    "object_detector": "none",
+    "object_threshold": 0.4,
     "vision": False,
     "vision_check": False,
     "vision_url": "http://127.0.0.1:1234/v1",
@@ -72,6 +78,7 @@ PATH_OPTIONS = {
     "csv",
 }
 BOOL_OPTIONS = {
+    "setup_recognition",
     "vision_boxes",
     "vision",
     "vision_check",
@@ -108,6 +115,21 @@ def load_yaml(path: Path, allowed: set[str]) -> dict:
 
 
 def validate_options(args):
+    if args.expression_model not in ("ferplus", "hsemotion") or args.object_detector not in (
+        "none",
+        "nanodet",
+    ):
+        raise ValueError("Unknown expression model or object detector")
+    if args.expression_model != "ferplus" and args.model_spec:
+        raise ValueError("Choose --expression-model or --model-spec")
+    if (
+        isinstance(args.face_detector_size, bool)
+        or not isinstance(args.face_detector_size, int)
+        or not 320 <= args.face_detector_size <= 1920
+    ):
+        raise ValueError("face-detector-size must be an integer in [320,1920]")
+    if args.batch and args.object_detector != "none":
+        raise ValueError("Batch mode is expression-only; use --object-detector none")
     client_from_args(args)  # Validates settings without connecting to LM Studio.
     validate_prompt(args.vision_prompt)
     if (
@@ -130,6 +152,8 @@ def validate_options(args):
     ):
         raise ValueError("max_frames must be a positive integer")
     for name in (
+        "expression_margin",
+        "object_threshold",
         "threshold",
         "temperature",
         "smoothing",
@@ -154,6 +178,8 @@ def validate_options(args):
             raise ValueError(f"{name} must be a positive integer")
     if not 0 <= args.threshold <= 1 or args.temperature <= 0 or args.smoothing < 0:
         raise ValueError("Invalid threshold, temperature, or smoothing")
+    if not 0 <= args.expression_margin <= 1 or not 0 < args.object_threshold <= 1:
+        raise ValueError("Expression margin must be in [0,1] and object threshold in (0,1]")
     if not 0 < args.min_overlap <= 1 or not 0 <= args.event_confidence <= 1:
         raise ValueError("Invalid overlap or event confidence")
     if not 0 <= args.min_brightness < args.max_brightness <= 255 or args.min_sharpness < 0:
@@ -193,6 +219,9 @@ def recognizer_options(args) -> dict:
     from .quality import QualityPolicy
 
     return {
+        "expression_model": args.expression_model,
+        "expression_margin": args.expression_margin,
+        "face_detector_size": args.face_detector_size,
         "engine": args.engine,
         "provider": args.provider,
         "model_spec": args.model_spec,

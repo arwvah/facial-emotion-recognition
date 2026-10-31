@@ -103,6 +103,20 @@ def dashboard(
     selected = next(
         (face for face in faces if face.track_id == selected_id), faces[0] if faces else None
     )
+    if selected and selected.uncertainty_reason:
+        tips = {
+            "face_too_small": "Move closer to the camera",
+            "too_dark": "Add light in front of your face",
+            "overexposed": "Reduce strong light on your face",
+            "blurry": "Hold still and check camera focus",
+        }
+        reasons = (selected.quality or {}).get("reasons", [])
+        hint = next(
+            (tips[reason] for reason in reasons if reason in tips),
+            "Expression unclear; hold a natural pose in good light",
+        )
+        text(canvas, hint, (30, 91), 0.42, (153, 190, 215))
+    text(canvas, f"{len(objects or [])} OBJECT BOX(ES)", (880, 70), 0.42, (153, 163, 170))
     detail = (
         f"Track #{selected.track_id} / TAB to switch"
         if selected and selected.track_id
@@ -150,7 +164,7 @@ def dashboard(
         (153, 163, 170),
     )
     controls = (
-        "A Ask  T Question  V Vision  M Faces  Q Quit"
+        "A Ask  R Inspect  T Question  V/M View  Q Quit"
         if vision is not None
         else "SPACE Pause  TAB Face  M View  S Save  Q Quit"
     )

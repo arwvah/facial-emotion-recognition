@@ -67,7 +67,7 @@ def read_manifest(path: Path, require_labels=True) -> list[dict]:
     return rows
 
 
-def metrics(labels, probabilities, threshold=0.5, rejected=None) -> dict:
+def metrics(labels, probabilities, threshold=0.5, rejected=None, margin=0.0) -> dict:
     probabilities = np.asarray(probabilities, dtype=np.float64)
     labels = np.asarray(labels, dtype=int)
     if (
@@ -82,7 +82,11 @@ def metrics(labels, probabilities, threshold=0.5, rejected=None) -> dict:
         raise ValueError("Invalid class index")
     prediction = probabilities.argmax(axis=1)
     confidence = probabilities.max(axis=1)
-    accepted = confidence >= threshold
+    if not 0 <= margin <= 1:
+        raise ValueError("Expression margin must be in [0,1]")
+    accepted = (confidence >= threshold) & (
+        confidence - np.partition(probabilities, -2, axis=1)[:, -2] >= margin
+    )
     if rejected is not None:
         accepted &= ~np.asarray(rejected, dtype=bool)
     output = np.where(accepted, prediction, 8)
@@ -133,7 +137,7 @@ def metrics(labels, probabilities, threshold=0.5, rejected=None) -> dict:
     }
 
 
-def fairness_metrics(rows, labels, probabilities, threshold, rejected, minimum=20):
+def fairness_metrics(rows, labels, probabilities, threshold, rejected, minimum=20, margin=0.0):
     groups = sorted({row.get("group", "") for row in rows if row.get("group")})
     result: dict[str, dict[str, Any]] = {}
     for group in groups:
@@ -149,6 +153,7 @@ def fairness_metrics(rows, labels, probabilities, threshold, rejected, minimum=2
                     np.asarray(probabilities)[mask],
                     threshold,
                     np.asarray(rejected)[mask],
+                    margin,
                 ),
             }
         )
@@ -219,7 +224,17 @@ def collect(rows, recognizer, input_mode="crop", quality_checks=False):
 def benchmark(
     rows, configuration, threshold=0.5, input_mode="crop", min_group=20, quality_checks=False
 ):
-    allowed = {"engine", "provider", "model_spec", "align", "tta", "temperature", "calibration"}
+    allowed = {
+        "engine",
+        "provider",
+        "model_spec",
+        "expression_model",
+        "expression_margin",
+        "align",
+        "tta",
+        "temperature",
+        "calibration",
+    }
     if set(configuration) - allowed:
         raise ValueError("Unknown benchmark model setting")
     model_options = dict(configuration)
@@ -244,7 +259,7 @@ def benchmark(
     collect(rows[:1], recognizer, input_mode, quality_checks)
     probabilities, rejected, latencies = collect(rows, recognizer, input_mode, quality_checks)
     labels = np.array([RAW_LABELS.index(row["label"]) for row in rows])
-    result = metrics(labels, probabilities, threshold, rejected)
+    result = metrics(labels, probabilities, threshold, rejected, recognizer.expression_margin)
     result.update(
         {
             "engine": configuration.get("engine", "onnx"),
@@ -262,7 +277,13 @@ def benchmark(
             "latency_ms_p50": float(np.percentile(latencies, 50) * 1000),
             "latency_ms_p95": float(np.percentile(latencies, 95) * 1000),
             "fairness": fairness_metrics(
-                rows, labels, probabilities, threshold, rejected, min_group
+                rows,
+                labels,
+                probabilities,
+                threshold,
+                rejected,
+                min_group,
+                recognizer.expression_margin,
             ),
         }
     )
@@ -282,6 +303,8 @@ def main(argv=None):
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--models", type=Path, help="JSON list of named model configurations")
     parser.add_argument("--model-spec", type=Path)
+    parser.add_argument("--expression-model", choices=("ferplus", "hsemotion"), default="ferplus")
+    parser.add_argument("--expression-margin", type=float, default=0.0)
     parser.add_argument(
         "--calibration", type=Path, help="Evaluate with an already fitted temperature artifact"
     )
@@ -299,7 +322,15 @@ def main(argv=None):
         if not 0 <= args.threshold <= 1 or args.min_group < 1:
             raise ValueError("Invalid threshold or group size")
         rows = read_manifest(args.manifest)
-        configuration = {"engine": args.engine, "align": args.align, "tta": args.tta}
+        configuration = {
+            "engine": args.engine,
+            "align": args.align,
+            "tta": args.tta,
+            "expression_model": args.expression_model,
+            "expression_margin": args.expression_margin,
+        }
+        if args.model_spec and args.expression_model != "ferplus":
+            raise ValueError("Choose --expression-model or --model-spec")
         if args.model_spec:
             configuration["model_spec"] = args.model_spec
         if args.calibration:

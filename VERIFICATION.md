@@ -1,6 +1,38 @@
 # Verification — 2026-10-31
 
-## Current release: 1.2 — named object boxes
+## Current release: 1.3 — combined object and expression recognition
+
+- Downloaded both pinned optional weights and verified exact sizes and SHA-256 hashes.
+  `--setup-recognition` and the enhanced launcher's `--check` pass without opening a camera.
+- Actual NanoDet ONNX inference found bicycle, car and dog in the public
+  [YOLOX dog/bicycle test photograph](https://github.com/Megvii-BaseDetection/YOLOX/blob/main/assets/dog.jpg).
+  The vehicle label is the model's generic class, not a verified fine-grained vehicle type.
+  Real graph inspection confirmed six outputs (three score heads then three distance heads).
+  The adapter follows that ordering; synthetic decoder fixtures match this verified contract.
+- Actual local Qwen3-VL returned the dog, bicycle, vehicle and tree. Crop inspection also
+  returned the dog and translated its box into original-frame coordinates. These examples
+  demonstrate working inference, not exhaustive recognition or localization accuracy.
+- HSEmotion processed the reference face with all eight finite probabilities, no alignment,
+  three-view augmentation and null AU/VA outputs. Its label differed from FER+; this is not
+  evidence that either label is correct. The 24-frame video fixture processed 36 face detections
+  with the enhanced models in 1.81 seconds (no Qwen, includes rendering/export overhead).
+- Warm CPU medians over ten repetitions on this machine: NanoDet **19.6 ms** for the 768×576
+  photograph; YuNet plus HSEmotion with TTA **33.1 ms** for the one-face reference image.
+  These are small smoke timings, not a general FPS benchmark or a camera latency guarantee.
+- Visually checked `outputs/recognition-v1.3-objects.png` and `outputs/recognition-v1.3-face.png`:
+  named object boxes and the eight-score expression panel render together correctly.
+  Actual REST `/analyze` and WebSocket inference returned object boxes and HSEmotion results.
+- **90 tests pass**, including decoding/letterboxing, RGB normalization, class order, source
+  fusion, crop coordinate restoration, margin abstention in tracking/evaluation, configuration
+  rejection, download no-storage handling and CLI/API operation without a language model.
+  Ruff lint/format, mypy across **21 modules**, lock verification and wheel/sdist build pass.
+  Package contents include new modules and third-party notices; weights and local media are excluded.
+
+Physical webcam accuracy, demographic performance and calibration gains remain unmeasured.
+No labeled evaluation dataset was supplied. Core FER+ defaults remain available for comparison;
+the enhanced preset is a model choice, not a promise to recognize every object or expression.
+
+## Release 1.2 — named object boxes
 
 - The real LM Studio Qwen3-VL model returned structured names and normalized object coordinates.
   The application validated these and mapped them into original-frame pixels. Visually checked
@@ -47,7 +79,7 @@
 
 Physical webcam use and broad object/OCR accuracy remain untested. LM Studio runtime logging is
 outside the application's no-storage control. The vision model does not supply calibrated
-confidence, object boxes, reliable identity, feelings, AU or VA outputs. See VISION.md.
+confidence, reliable identity, feelings, AU or VA outputs. See VISION.md.
 
 ## Release 1.0
 

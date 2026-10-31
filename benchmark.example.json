@@ -1,4 +1,5 @@
 [
+  {"name": "HSEmotion RGB CPU", "expression_model": "hsemotion", "engine": "onnx", "align": false, "tta": true},
   {"name": "FER+ ONNX CPU", "engine": "onnx", "align": false},
   {"name": "FER+ OpenCV CPU", "engine": "opencv", "align": false},
   {"name": "FER+ OpenVINO CPU", "engine": "openvino", "align": false}

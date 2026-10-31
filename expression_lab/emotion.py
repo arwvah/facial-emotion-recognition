@@ -109,11 +109,11 @@ def softmax(logits: np.ndarray) -> np.ndarray:
     return scores / scores.sum()
 
 
-def classify(probabilities: np.ndarray, threshold: float) -> tuple[str, float]:
+def classify(probabilities: np.ndarray, threshold: float, margin: float = 0.0) -> tuple[str, float]:
     winner = int(np.argmax(probabilities))
     confidence = float(probabilities[winner])
     label = RAW_LABELS[winner]
-    if confidence < threshold:
+    if confidence < threshold or confidence - float(np.partition(probabilities, -2)[-2]) < margin:
         label = "uncertain"
     return label, confidence
 
@@ -171,6 +171,9 @@ class EmotionRecognizer:
         quality=None,
         quality_mode="skip",
         auxiliary=None,
+        expression_model="ferplus",
+        expression_margin=0.0,
+        face_detector_size=640,
     ):
         from .backends import AuxiliaryBackend, InferenceBackend, ModelSpec
         from .quality import QualityPolicy
@@ -179,11 +182,25 @@ class EmotionRecognizer:
             raise ValueError("Threshold must be in [0,1] and temperature must be positive.")
         if quality_mode not in ("skip", "flag"):
             raise ValueError("Quality mode must be skip or flag.")
+        if (
+            expression_model not in ("ferplus", "hsemotion")
+            or not 0 <= expression_margin <= 1
+            or not 320 <= face_detector_size <= 1920
+        ):
+            raise ValueError("Invalid expression model, margin, or face detector size")
+        self.expression_margin = expression_margin
+        self.face_detector_size = face_detector_size
+        self.expression_model = expression_model
         spec = (
             ModelSpec.load(Path(model_spec)) if model_spec else ModelSpec(MODEL_PATH, MODEL_SHA256)
         )
+        if expression_model == "hsemotion" and model_spec is None:
+            from .recognition_models import hsemotion_spec
+
+            spec = hsemotion_spec()
         if not spec.path.exists():
-            raise FileNotFoundError("CNN model missing. Run: expression-lab --setup")
+            setup = "--setup-recognition" if expression_model == "hsemotion" else "--setup"
+            raise FileNotFoundError(f"CNN model missing. Run: expression-lab {setup}")
         self.backend = InferenceBackend(spec, engine, provider)
         if engine == "onnx":
             self.session = self.backend.session
@@ -257,8 +274,12 @@ class EmotionRecognizer:
                     else crop
                 )
                 scores = self.predict_crop(input_crop)
-            label, confidence = classify(scores, self.threshold)
+            label, confidence = classify(
+                scores, self.threshold, getattr(self, "expression_margin", 0.0)
+            )
             reason = "image_quality" if bad else "low_confidence" if label == "uncertain" else None
+            if not bad and label == "uncertain" and confidence >= self.threshold:
+                reason = "ambiguous_expression"
             if bad:
                 label = "uncertain"
             auxiliary_backend = getattr(self, "auxiliary", None)
@@ -291,7 +312,7 @@ class EmotionRecognizer:
             raise ValueError("Expected a nonempty BGR image.")
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         # Downscale detection only; classify crops from the original frame.
-        scale = min(1.0, 640 / max(gray.shape))
+        scale = min(1.0, getattr(self, "face_detector_size", 640) / max(gray.shape))
         small = cv2.resize(frame, None, fx=scale, fy=scale)
         sx, sy = frame.shape[1] / small.shape[1], frame.shape[0] / small.shape[0]
         detection_scores: list[float | None]

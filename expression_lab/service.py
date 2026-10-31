@@ -20,7 +20,7 @@ def decode_frame(data: bytes):
     return frame
 
 
-def create_app(config=None, recognizer_factory=None, vision_factory=None):
+def create_app(config=None, recognizer_factory=None, vision_factory=None, object_factory=None):
     try:
         from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
     except ImportError as exc:
@@ -39,13 +39,14 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None):
         raise ValueError("The API does not send webhooks; use the CLI event options instead")
     token = os.environ.get("EXPRESSION_LAB_API_TOKEN", "")
     model = None
+    object_model = None
     model_lock = threading.Lock()
     vision_client = (
         (vision_factory() if vision_factory else client_from_args(args)) if args.vision else None
     )
     app = FastAPI(
         title="Expression Lab local inference",
-        version="1.2.0",
+        version="1.3.0",
         description="Local expression estimates, not feelings. Obtain consent before submitting images. Frames are processed in memory; no image storage or webhooks.",
     )
 
@@ -72,6 +73,18 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None):
                 apply_calibration(model, args)
         return model
 
+    def detect_objects(frame):
+        nonlocal object_model
+        if args.object_detector == "none":
+            return []
+        if object_model is None:
+            from .object_detector import ObjectDetector
+
+            object_model = (
+                object_factory() if object_factory else ObjectDetector(args.object_threshold)
+            )
+        return object_model.detect(frame)
+
     def process(data, pipeline=None):
         frame = decode_frame(data)
         with model_lock:
@@ -80,11 +93,15 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None):
                 pipeline = FramePipeline(recognizer, 0, args.min_overlap)
             timestamp = time.monotonic()
             faces = pipeline.process(frame, timestamp)
+            objects = detect_objects(frame)
         return {
             "schema_version": 3,
             "frame_size_wh": [frame.shape[1], frame.shape[0]],
             "timestamp_seconds": timestamp,
             "faces": [face.as_dict() for face in faces],
+            "objects": objects,
+            "object_detector": args.object_detector,
+            "expression_model": "custom" if args.model_spec else args.expression_model,
             "storage": "memory_only",
             "auxiliary_available": recognizer.auxiliary is not None,
         }
@@ -111,6 +128,9 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None):
             "vision_enabled": args.vision,
             "vision_model": args.vision_model if args.vision else None,
             "vision_boxes": args.vision and args.vision_boxes,
+            "object_detector": args.object_detector,
+            "expression_model": "custom" if args.model_spec else args.expression_model,
+            "expression_margin": args.expression_margin,
             "notice": "Visible expression estimates, not feelings. Obtain consent before submitting images.",
         }
 
