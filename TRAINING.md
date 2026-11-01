@@ -255,3 +255,62 @@ PYTHONPATH=. OPENBLAS_NUM_THREADS=2 .venv/bin/python scripts/train_age_head.py \
 Reports, baseline pointer, checksums and deployment decision are in
 `outputs/age-expanded-2026-11-01/`. The local launcher remains `./run-trained.sh`; restart it
 to load the updated head. Neither test-set result establishes accuracy for a particular person.
+
+## Residual expression classifier experiment
+
+This experiment keeps the existing CNN and linear classifier fixed, then trains a 64-unit ReLU
+residual branch to correct its eight logits. It uses the same 22,820 training, 2,888 validation,
+and 2,902 test examples as the prior expression run, with the prior similarity exclusions.
+Training-only horizontal flips create 45,640 training views. Hidden-unit dropout is 0.25.
+
+Checkpoint selection minimizes validation NLL, with a maximum of 100 epochs and patience 12.
+Before results, promotion required a validation top-1 gain of at least 0.003, no test top-1 or
+macro-F1 decrease, and no test NLL increase greater than 0.02. The original model is retained if
+those conditions fail. The test subset was reported in earlier runs; it is not an external test.
+
+The baseline for this trainer must be the earlier **linear** expression model, ending in Gemm.
+It cannot directly initialize from a previously exported residual network. Reproduce from the
+project root with the saved linear baseline (or its original model manifest):
+
+```bash
+PYTHONPATH=. OPENBLAS_NUM_THREADS=2 .venv/bin/python scripts/train_expression_residual.py \
+  --manifest datasets/expanded-v1/expressions/manifest.csv \
+  --baseline models/trained-expression.json \
+  --reference-report outputs/expression-expanded-2026-11-01/training-report.json \
+  --output outputs/expression-residual-new
+```
+
+Training features are cached locally in an ignored output directory. Weights and features are
+not distributed with source. The export folds feature normalization into the residual branch;
+its probabilities are compared with the learned classifier on an actual test image before use.
+The age and object models are separate and receive no updates from this training run.
+
+### Residual expression result
+
+Training stopped at **epoch 17**, selecting **epoch 5** by validation NLL. The outcome was:
+
+| Metric | Current baseline | Experimental residual head |
+|---|---:|---:|
+| Validation top-1 | 78.08% | 78.29% |
+| Validation NLL | 0.59768 | 0.59528 |
+| Test raw top-1 | 79.39% | 79.70% |
+| Test accuracy counting uncertain as incorrect | 73.71% | 74.22% |
+| Test macro F1 with uncertainty | 0.76683 | 0.76936 |
+| Test NLL | 0.59564 | 0.59003 |
+
+The validation gain was **0.208 percentage points**, below the predeclared **0.3-point**
+minimum. The candidate was therefore **not promoted**. The installed expression model remains
+the 79.39% linear baseline. These small gains do not establish a reliable general improvement.
+Further epochs were stopped when validation loss ceased improving.
+
+The exported graph passed ONNX checking and numerical comparison with the learned classifier.
+Actual app inference succeeded together with the separate age model. All baseline initializer
+weights were verified unchanged; the residual branch adds four new tensors. The data manifest
+hash and split counts match the earlier run. Reports, epoch history and the deployment decision
+are in `outputs/expression-residual-2026-11-01/`.
+
+To inspect this experimental candidate without changing the default model:
+
+```bash
+./run-trained.sh --model-spec outputs/expression-residual-2026-11-01/model.json
+```

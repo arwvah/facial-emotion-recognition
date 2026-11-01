@@ -240,3 +240,13 @@ webcam remains untested, and spatial IDs may switch when real faces cross or ove
   inference and custom model diagnostics passed. No inference backbone weights changed.
 - Added reference-split regression coverage. Local metrics compare approximate dataset age
   labels and do not establish person separation, demographic fairness or webcam accuracy.
+
+## Residual expression experiment — 2026-11-01
+
+- Trained a 64-unit residual classifier using 22,820 original training faces and their flips.
+  The reference dataset hash, 2,888 validation images and 2,902 test images were preserved.
+- Stopped after 17 epochs; selected epoch 5. Test top-1 changed from 79.39% to 79.70%, while
+  validation top-1 changed from 78.08% to 78.29%. The validation gain failed the predeclared
+  0.3-point promotion threshold; the baseline remains active.
+- Numerical ONNX export comparison, real app inference, immutable baseline-weight checks,
+  lint, type checks and the 96-test suite passed. The age and object models were unchanged.
