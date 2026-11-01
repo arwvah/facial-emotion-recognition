@@ -16,6 +16,7 @@ DEFAULTS = {
     "face_detector_size": 640,
     "object_detector": "none",
     "object_model_spec": None,
+    "age_model_spec": None,
     "object_threshold": 0.4,
     "vision": False,
     "vision_check": False,
@@ -63,6 +64,7 @@ DEFAULTS = {
     "csv": None,
 }
 PATH_OPTIONS = {
+    "age_model_spec",
     "object_model_spec",
     "vision_jsonl",
     "video",
@@ -223,6 +225,7 @@ def recognizer_options(args) -> dict:
     from .quality import QualityPolicy
 
     return {
+        "age_model_spec": args.age_model_spec,
         "expression_model": args.expression_model,
         "expression_margin": args.expression_margin,
         "face_detector_size": args.face_detector_size,

@@ -1,5 +1,20 @@
 # Verification — 2026-10-31
 
+## Local age-estimation release 1.5 — 2026-11-01
+
+- Downloaded 2,200 age-labeled images from a public UTKFace-derived research mirror; exact
+  duplicates were removed, leaving 1,595 training, 298 validation and 299 test images.
+- Trained a ridge age head on frozen RGB224 CNN features. The 299-image test MAE was 7.58 years;
+  a constant training-mean baseline produced 20.27 years. Data labels are approximate, and
+  identity and pretraining overlap are unknown. This is not proof of age or webcam accuracy.
+- Exported ONNX, checked the graph and numerical output against the learned regressor. Real app
+  image inference, custom-model diagnostics, REST inference, and a 24-frame video with 36 age
+  outputs passed. Visually inspected the age label on `outputs/age-training-2026-11-01/preview.png`.
+- Unit tests cover invalid age outputs and quality rejection. Age is null unless configured
+  and for rejected faces. The application does not automatically save identifying names, face embeddings, images or age logs.
+
+
+
 ## Local trained-model release 1.4 — 2026-11-01
 
 - Expanded expression training: 22,820 accepted training faces; selected epoch 66, stopped at 81.

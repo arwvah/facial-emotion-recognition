@@ -77,6 +77,8 @@ def dashboard(
             label = f"#{face.track_id} " + label
         if face.label != "uncertain":
             label += f" {face.confidence:.0%}"
+        if face.age_estimate is not None:
+            label += f" / AGE ~{face.age_estimate:.0f}"
         font_scale = max(0.4, min(0.7, frame.shape[1] / 1400))
         (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
         label_y = max(th + 8, y)

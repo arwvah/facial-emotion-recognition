@@ -32,6 +32,14 @@ Expression estimates describe visible patterns, not someone's feelings. Obtain c
 processing people. [Feature status](FEATURES.md) · [Privacy](PRIVACY.md) · [Model card](MODEL_CARD.md)
 · [Development/evaluation](DEVELOPMENT.md) · [Verification](VERIFICATION.md).
 
+## Approximate age estimation
+
+The local `./run-trained.sh` launcher automatically uses the separately trained age model when
+`models/trained-age.json` is installed. It shows `AGE ~N` beside each detected face and returns
+`age_estimate_years` in JSON. Poor-quality faces have no age estimate. On the small held-out test
+subset the model's mean absolute error was **7.6 years**; this is an approximate visible-age
+estimate, not proof of age. See [TRAINING.md](TRAINING.md) for data provenance and limitations.
+
 ## Locally trained expression model
 
 The expanded local training run reached **79.4% raw top-1 accuracy** on the fixed 2,902-image

@@ -46,7 +46,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None, object
     )
     app = FastAPI(
         title="Expression Lab local inference",
-        version="1.4.0",
+        version="1.5.0",
         description="Local expression estimates, not feelings. Obtain consent before submitting images. Frames are processed in memory; no image storage or webhooks.",
     )
 
@@ -128,6 +128,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None, object
             "alignment": args.align,
             "tta": args.tta,
             "auxiliary_configured": bool(args.auxiliary),
+            "age_model_configured": bool(args.age_model_spec),
             "vision_enabled": args.vision,
             "vision_model": args.vision_model if args.vision else None,
             "vision_boxes": args.vision and args.vision_boxes,

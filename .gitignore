@@ -21,3 +21,4 @@ datasets/
 *.parquet
 models/trained-expression.json
 models/trained-objects.json
+models/trained-age.json

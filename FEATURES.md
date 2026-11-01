@@ -1,4 +1,4 @@
-# Feature status — 1.4
+# Feature status — 1.5
 
 | Requested area | Implementation | What remains data/hardware dependent |
 |---|---|---|
@@ -6,6 +6,7 @@
 | Named object boxes | NanoDet 80-class detection each frame plus up to six Qwen regions; names below boxes, coordinate validation and delayed-box tracking | Approximate localization; no object-detection accuracy benchmark |
 | Close-up inspection | R selects an original-pixel crop for Qwen; boxes map back to the full frame | Cannot recover absent details or unknown objects |
 | Expression model choice | FER+ or HSEmotion RGB224, top-two ambiguity margin and configurable face detector size | Compare on representative labeled camera data |
+| Approximate age | Optional local age-regression head, face overlay and API/JSON value; quality rejection | Test MAE 7.58 years on a small research subset; no verified birth records or identity-disjoint guarantee |
 | Local transfer learning | Frozen CNN classifier training, validation stopping, model export and checked manifests | No perfection guarantee; object candidates rejected if they fail the evaluation gate |
 | Confidence / temperature calibration | Thresholded uncertain output; held-out fitting command; model/contract-bound artifacts | Fit and assess on a labeled, representative calibration/test split |
 | Face alignment | YuNet eye-line rotation and consistent eye positioning; safe crop fallback | Compare accuracy against unaligned input on the intended population |
@@ -26,7 +27,7 @@
 | Skipping / async | Optical flow between detections; optional inference intervals; bounded worker prefetch | Validate missed transients and speed on the target stream |
 | ONNX/OpenVINO / GPU | ONNX input adapters, paired-checksum OpenVINO IR export, provider selection | GPU/provider-specific hardware is not available for validation here |
 | INT8 | Static QDQ candidate conversion, independent test-set accuracy gate, validation manifest | No production INT8 approval without representative calibration/test data |
-| Engineering | 93 passing tests, full-module mypy, lint/format, GitHub Actions workflow | See the repository Actions tab for current hosted status |
+| Engineering | 95 passing tests, full-module mypy, lint/format, GitHub Actions workflow | See the repository Actions tab for current hosted status |
 | Privacy / ethics | Consent notice/ack flag, no automatic inference-time downloads, local defaults, model card | Obtain consent and assess suitability for the actual use case |
 
 There is no default trained AU/VA model, labeled evaluation dataset, or fabricated benchmark.

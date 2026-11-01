@@ -12,4 +12,4 @@ prune .mypy_cache
 
 include TRAINING.md run-trained.sh
 
-recursive-include scripts train*.py expand*.py fetch*.py
+recursive-include scripts train*.py expand*.py fetch*.py download_age_dataset.py

@@ -1,5 +1,27 @@
 # Pretrained CNN provenance
 
+## Local age estimation (1.5)
+
+A separate local ONNX head estimates visible age in years. It was trained using ridge regression
+on frozen HSEmotion CNN features, using 1,595 training images from the community mirror
+[UTK-Face-Revised](https://huggingface.co/datasets/deedax/UTK-Face-Revised), and 298 validation
+images to select regularization. On 299 held-out images, mean absolute error was **7.58 years**;
+a constant training-mean predictor had **20.27 years** of error on that same subset.
+
+The source dataset is derived from [UTKFace](https://github.com/aicip/UTKFace), which is available
+for non-commercial research and whose age labels were algorithmically estimated and human-checked.
+They are not verified birth records. The mirrored dataset revision was `91a76d0b7626172b7fc5ca3c8ca2bbf2233fbefa`
+when checked after download; the dataset-viewer requests were not revision-pinned. Exact image bytes
+are hashed in the local raw manifest. Source train and validation partitions were separated, then
+validation was divided into model-selection and test sets. Exact duplicates were removed, but
+identity separation and pretraining overlap are unknown. No demographic fairness assessment or
+camera-specific accuracy validation has been performed.
+
+The model processes an unaligned original face crop with HSEmotion RGB224 normalization and
+returns one numerical prediction clipped to 0–116. Poor-quality crops produce no estimate. A number
+is an approximation; do not use it as evidence of age. The model is local and separate from the
+expression and object models; neither training data nor weights are bundled with source.
+
 ## Local transfer learning (1.4)
 
 The expanded local expression run trained only the final classifier on frozen HSEmotion features.

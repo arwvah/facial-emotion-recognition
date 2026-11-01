@@ -115,6 +115,7 @@ def parse_args(argv=None):
             args.calibration,
             args.model_spec,
             args.object_model_spec,
+            args.age_model_spec,
             args.auxiliary,
         )
         if p
@@ -164,7 +165,8 @@ def run(args):
         from .diagnostics import system_report
 
         report = system_report(args.detector, args.expression_model, args.object_detector)
-        if args.model_spec or args.object_model_spec:
+        if args.model_spec or args.object_model_spec or args.age_model_spec:
+            from .age import AgeEstimator
             from .backends import ModelSpec
             from .object_detector import ObjectDetector
 
@@ -172,13 +174,16 @@ def run(args):
             for name, manifest in (
                 ("custom_expression", args.model_spec),
                 ("custom_objects", args.object_model_spec),
+                ("custom_age", args.age_model_spec),
             ):
                 if manifest:
                     try:
                         if name == "custom_expression":
                             ModelSpec.load(manifest)
-                        else:
+                        elif name == "custom_objects":
                             ObjectDetector(args.object_threshold, manifest)
+                        else:
+                            AgeEstimator(manifest, args.provider)
                         selected[name] = {"verified": True, "manifest": str(manifest)}
                     except (OSError, ValueError, RuntimeError) as exc:
                         selected[name] = {
@@ -196,9 +201,11 @@ def run(args):
                     "custom_objects" if args.object_model_spec else args.object_detector
                 ]["verified"]
             )
+            age_ready = not args.age_model_spec or report["models"]["custom_age"]["verified"]
             report["ready"] = (
                 expression_ready
                 and object_ready
+                and age_ready
                 and (args.detector == "haar" or report["models"]["yunet"]["verified"])
             )
         print(json.dumps(report, indent=2))
@@ -432,6 +439,7 @@ def run(args):
                     "inference_ran": pipeline.last_inference,
                     "events": emitted,
                     "auxiliary_available": recognizer.auxiliary is not None,
+                    "age_model_configured": bool(args.age_model_spec),
                     "consent_acknowledged": args.consent_ack,
                     "faces": [face.as_dict() for face in faces],
                 }

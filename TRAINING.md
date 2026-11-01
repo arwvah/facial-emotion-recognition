@@ -179,3 +179,36 @@ establish an object-recognition gain. Further useful work requires a different t
 or model architecture, followed by another independent evaluation; additional epochs alone are
 not evidence of improvement. The user-visible trained launcher uses the improved expression
 candidate together with the original object detector.
+
+## Local age-regression run — 2026-11-01
+
+A frozen HSEmotion backbone provided 1,280 features. A ridge-regression age head was trained on
+1,595 images, selected using 298 validation images, and evaluated on 299 test images. The test
+mean absolute error was **7.58 years**, compared with **20.27 years** for a constant training-mean
+predictor. These numbers compare predictions with approximate dataset labels, not verified dates
+of birth. Averages do not give a reliable uncertainty interval for an individual prediction.
+
+The subset was downloaded from [UTK-Face-Revised](https://huggingface.co/datasets/deedax/UTK-Face-Revised)
+via the dataset viewer: the first 1,600 training and 600 validation rows were requested, then 8
+exact duplicates were removed. The repository commit observed after download was
+`91a76d0b7626172b7fc5ca3c8ca2bbf2233fbefa`; viewer requests were not pinned to it. Original
+[UTKFace](https://github.com/aicip/UTKFace) data is for non-commercial research, with age labels
+estimated by an algorithm and checked by an annotator. Person separation and demographic
+performance are unknown; see MODEL_CARD.md. The raw local manifest records image SHA-256 hashes.
+
+The output is a one-value ONNX model with the same RGB224 face input as HSEmotion. User-visible
+age is approximate, omitted for poor image quality, and provided as `age_estimate_years` in JSON.
+`./run-trained.sh` detects `models/trained-age.json` automatically. The original emotion and
+object weights remain separate. Downloaded data and model weights are not committed to Git.
+
+Reproduce from the project root (dataset-viewer contents may change):
+
+```bash
+.venv/bin/python scripts/download_age_dataset.py --output datasets/age-training-new
+PYTHONPATH=. OPENBLAS_NUM_THREADS=2 .venv/bin/python scripts/train_age_head.py \
+  --manifest datasets/age-training-new/raw-manifest.json --output outputs/age-training-new
+```
+
+Training requires the `onnx` development/optimization dependency. The age and expression models
+run separately; their face-crop preprocessing is independent. Local results are in
+`outputs/age-training-2026-11-01/`, including the checksum manifest, detailed metrics and preview.

@@ -5,9 +5,12 @@ if [[ ! -f models/trained-expression.json ]]; then
   echo 'No local trained expression model is installed. See TRAINING.md.' >&2
   exit 1
 fi
-object_options=()
-if [[ -f models/trained-objects.json ]]; then
-  object_options=(--object-model-spec models/trained-objects.json)
+model_options=()
+if [[ -f models/trained-age.json ]]; then
+  model_options+=(--age-model-spec models/trained-age.json)
 fi
-exec ./run-vision.sh "${object_options[@]}" --expression-model ferplus --model-spec models/trained-expression.json \
+if [[ -f models/trained-objects.json ]]; then
+  model_options+=(--object-model-spec models/trained-objects.json)
+fi
+exec ./run-vision.sh "${model_options[@]}" --expression-model ferplus --model-spec models/trained-expression.json \
   --no-tta --no-storage "$@"

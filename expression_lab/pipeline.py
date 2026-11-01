@@ -107,6 +107,7 @@ class FramePipeline:
                                 quality=quality,
                                 label="uncertain",
                                 uncertainty_reason="image_quality",
+                                age_estimate=None,
                                 fresh_prediction=False,
                             )
                         )

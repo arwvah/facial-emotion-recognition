@@ -135,6 +135,7 @@ class FaceResult:
     action_units: dict | None = None
     fresh_prediction: bool = True
     classification_skipped: bool = False
+    age_estimate: float | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -153,6 +154,7 @@ class FaceResult:
             "action_units": self.action_units,
             "fresh_prediction": self.fresh_prediction,
             "classification_skipped": self.classification_skipped,
+            "age_estimate_years": self.age_estimate,
         }
 
 
@@ -174,6 +176,7 @@ class EmotionRecognizer:
         expression_model="ferplus",
         expression_margin=0.0,
         face_detector_size=640,
+        age_model_spec=None,
     ):
         from .backends import AuxiliaryBackend, InferenceBackend, ModelSpec
         from .quality import QualityPolicy
@@ -211,6 +214,11 @@ class EmotionRecognizer:
         self.quality_policy = quality or QualityPolicy()
         self.quality_mode = quality_mode
         self.auxiliary = AuxiliaryBackend(Path(auxiliary), provider) if auxiliary else None
+        self.age_estimator: Any = None
+        if age_model_spec:
+            from .age import AgeEstimator
+
+            self.age_estimator = AgeEstimator(Path(age_model_spec), provider)
         self.detector_kind = detector
         self.detector: Any
         if detector == "yunet":
@@ -286,6 +294,8 @@ class EmotionRecognizer:
             auxiliary = (
                 auxiliary_backend.predict(crop) if auxiliary_backend is not None and not bad else {}
             )
+            age_backend = getattr(self, "age_estimator", None)
+            age = age_backend.predict(original) if age_backend is not None and not bad else None
             results.append(
                 replace(
                     observation,
@@ -297,6 +307,7 @@ class EmotionRecognizer:
                     uncertainty_reason=reason,
                     valence_arousal=auxiliary.get("valence_arousal"),
                     action_units=auxiliary.get("action_units"),
+                    age_estimate=age,
                     classification_skipped=bool(
                         bad and getattr(self, "quality_mode", "skip") == "skip"
                     ),
