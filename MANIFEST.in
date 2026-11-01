@@ -8,6 +8,8 @@ recursive-include .github *.yml
 prune models
 prune outputs
 prune .venv
+prune .venv-yolo
+prune experiments
 prune .mypy_cache
 
 include TRAINING.md run-trained.sh

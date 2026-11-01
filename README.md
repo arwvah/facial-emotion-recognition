@@ -50,6 +50,11 @@ for split limitations, uncertainty coverage, training commands, and the rejected
 If you have the locally trained weights installed, run `./run-trained.sh` (or add `--no-vision`).
 Weights are not bundled in Git or packages; other installations must reproduce the training run.
 
+An optional [YOLO expression experiment](experiments/yolo_expression/README.md) adds
+full-backbone fine-tuning, isolated CUDA dependencies, ONNX export checks and a comparison
+against the current model. Training results are pending. This checkout-only experiment
+uses AGPL-3.0 terms and is separate from the application's Apache-2.0 package.
+
 ## Install and start
 
 Python 3.12 or 3.13. From this checkout, using [uv](https://docs.astral.sh/uv/):

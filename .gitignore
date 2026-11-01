@@ -22,3 +22,4 @@ datasets/
 models/trained-expression.json
 models/trained-objects.json
 models/trained-age.json
+.venv-yolo/

@@ -1,0 +1,7 @@
+# Optional Linux/Python 3.12 CUDA experiment. Install requirements-lock.txt for pinned hashes.
+torch==2.7.1
+torchvision==0.22.1
+ultralytics==8.4.197
+onnx==1.19.1
+onnxruntime>=1.20,<2
+opencv-python>=4.10,<5

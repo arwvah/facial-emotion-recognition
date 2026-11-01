@@ -1,7 +1,14 @@
 # Local transfer-learning results — 2026-11-01
 
-Both runs train final classification layers on frozen CNN features. They do not retrain
-backbones. NumPy, ONNX and ONNX Runtime are sufficient; no PyTorch installation is needed.
+The [optional YOLO experiment](experiments/yolo_expression/README.md) fine-tunes a
+YOLO26n-cls backbone in a separate environment. Its local job is currently installing
+CUDA dependencies; no YOLO expression score has been measured. Its runner will train,
+select on validation, export, verify and evaluate automatically. The app retains the
+79.39% local expression model during this experiment.
+
+The original expression-head and object-head runs below train final classification layers
+on frozen CNN features. They do not retrain backbones. NumPy, ONNX and ONNX Runtime are
+sufficient for those runs; no PyTorch installation is needed.
 Production weights and the standard launcher remain unchanged. Artifacts are local, ignored
 under `outputs/`, and are not distributed with source.
 

@@ -1,4 +1,6 @@
 .venv
+.venv-yolo
+experiments
 .git
 __pycache__
 outputs
