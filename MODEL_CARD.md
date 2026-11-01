@@ -1,5 +1,22 @@
 # Pretrained CNN provenance
 
+## Expanded age model (1.5.1)
+
+The active local age head was retrained on **7,531 accepted training faces** from the same
+research mirror. Original validation/test membership was preserved (298/299 images), and 244
+additional source-validation images were reserved as a new holdout. Exact duplicates and new
+holdout matches to previously used images were excluded. Identity separation remains unknown.
+
+Ridge and Huber fits were selected using validation MAE only. The selected model was a Huber
+IRLS fit (delta 8 years, six iterations, regularization 100). On the original 299-image test set,
+MAE decreased from **7.58 to 7.01 years**. On the 244 newly reserved images, it decreased from
+**8.23 to 7.21 years**. Both comparisons use the same images and preprocessing for both models.
+The new holdout was evaluated after fitting and selection, then used for the deployment gate.
+It must not guide further hyperparameter tuning. This is not proof of age or webcam accuracy.
+
+The previous ONNX weights are preserved; the active local manifest points to the expanded
+candidate. Data provenance and original model limitations below still apply.
+
 ## Local age estimation (1.5)
 
 A separate local ONNX head estimates visible age in years. It was trained using ridge regression

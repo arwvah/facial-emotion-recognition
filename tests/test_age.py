@@ -6,9 +6,22 @@ import numpy as np
 from expression_lab.age import AgeEstimator
 from expression_lab.emotion import RAW_LABELS, EmotionRecognizer, FaceResult
 from expression_lab.quality import QualityPolicy
+from scripts.train_age_head import reference_split_map
 
 
 class AgeTests(unittest.TestCase):
+    def test_reference_splits_remove_duplicates_and_preserve_record_ids(self):
+        records = [{"source_split": "train", "index": 0, "sha256": "training"}]
+        records += [
+            {"source_split": "valid", "index": i, "sha256": f"validation-{i}"} for i in range(6)
+        ]
+        records.append({"source_split": "valid", "index": 6, "sha256": "training"})
+        mapping = reference_split_map(records)
+        self.assertEqual(mapping[("train", 0)], "train")
+        self.assertNotIn(("valid", 6), mapping)
+        self.assertTrue(all(mapping[("valid", i)] in ("val", "test") for i in range(6)))
+        self.assertEqual(mapping, reference_split_map(records))
+
     def test_age_backend_rejects_invalid_and_clamps_extremes(self):
         model = AgeEstimator.__new__(AgeEstimator)
         model.backend = MagicMock()

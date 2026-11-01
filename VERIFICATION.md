@@ -228,3 +228,15 @@ webcam remains untested, and spatial IDs may switch when real faces cross or ove
   Artifacts: `outputs/eight-emotions-video.mp4` and `outputs/eight-emotions-video.jsonl`.
 - Class-mapping tests use controlled scores; the real sample clip is not an accuracy benchmark
   for the four added expressions. Webcam hardware remains untested.
+
+## Expanded age run 1.5.1 — 2026-11-01
+
+- Completed all 8,469 requested source rows, reusing cached images; 7,531 training examples
+  remained after exclusions. The original 298/299 validation/test membership was preserved.
+- Validation-only model selection chose a Huber regression head. Original-test MAE dropped
+  from 7.58 to 7.01 years; the 244-image new holdout dropped from 8.23 to 7.21 years.
+- The candidate passed the predeclared promotion rule and was installed via an atomic manifest
+  update. The previous weights are preserved. ONNX export/numerical checks, application image
+  inference and custom model diagnostics passed. No inference backbone weights changed.
+- Added reference-split regression coverage. Local metrics compare approximate dataset age
+  labels and do not establish person separation, demographic fairness or webcam accuracy.

@@ -46,7 +46,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None, object
     )
     app = FastAPI(
         title="Expression Lab local inference",
-        version="1.5.0",
+        version="1.5.1",
         description="Local expression estimates, not feelings. Obtain consent before submitting images. Frames are processed in memory; no image storage or webhooks.",
     )
 

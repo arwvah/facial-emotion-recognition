@@ -212,3 +212,46 @@ PYTHONPATH=. OPENBLAS_NUM_THREADS=2 .venv/bin/python scripts/train_age_head.py \
 Training requires the `onnx` development/optimization dependency. The age and expression models
 run separately; their face-crop preprocessing is independent. Local results are in
 `outputs/age-training-2026-11-01/`, including the checksum manifest, detailed metrics and preview.
+
+## Expanded age model — 1.5.1
+
+The full revised source dataset was requested: 7,623 training rows and 846 validation rows.
+Previously downloaded images were reused through verified hard links. Download retries and
+explicit resume support preserve completed files after temporary server errors. The observed
+source repository revision remained `91a76d0b7626172b7fc5ca3c8ca2bbf2233fbefa`.
+
+After duplicate exclusions, the run used **7,531 training**, **298 validation**, **299 original
+test**, and **244 new holdout** images. Reference split membership is reproduced from the
+initial manifest and checked. New holdout images matching previously used images are excluded;
+new training images matching held-out images are also excluded. This is exact-byte duplicate
+control, not verified person separation or a near-duplicate guarantee.
+
+Validation MAE selected among ridge regularization values 10–10,000 and Huber IRLS fits
+(delta 8, six iterations). The chosen fit was Huber with regularization 100. The mean errors were:
+
+| Comparison | Previous model | Expanded model |
+|---|---:|---:|
+| Validation, 298 images | 7.99 years | 7.03 years |
+| Original test, 299 images | 7.58 years | 7.01 years |
+| New holdout, 244 images | 8.23 years | 7.21 years |
+
+A promotion gate declared before results required a validation reduction of at least 0.25 years
+and no error increase on either test set. The candidate passed. `models/trained-age.json` now
+points to `models/trained-age-expanded.onnx`; the previous weights remain at
+`models/trained-age.onnx`. The original test has been reported before; only the additional
+holdout was unused by the earlier run. Label uncertainty and source/identity limitations remain.
+
+```bash
+.venv/bin/python scripts/download_age_dataset.py --output datasets/age-expanded-new \
+  --train-count 7623 --valid-count 846 --reuse datasets/age-training
+# Add --resume if a transient download error interrupts the command.
+PYTHONPATH=. OPENBLAS_NUM_THREADS=2 .venv/bin/python scripts/train_age_head.py \
+  --manifest datasets/age-expanded-new/raw-manifest.json \
+  --reference-manifest datasets/age-training/raw-manifest.json \
+  --baseline-model outputs/age-expanded-2026-11-01/previous-model.json \
+  --robust --output outputs/age-expanded-new
+```
+
+Reports, baseline pointer, checksums and deployment decision are in
+`outputs/age-expanded-2026-11-01/`. The local launcher remains `./run-trained.sh`; restart it
+to load the updated head. Neither test-set result establishes accuracy for a particular person.

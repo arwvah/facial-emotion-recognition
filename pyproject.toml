@@ -1,7 +1,7 @@
 [project]
 license = "Apache-2.0"
 name = "facial-emotion-recognition"
-version = "1.5.0"
+version = "1.5.1"
 description = "Local webcam and video facial-expression classification with a pretrained CNN"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"

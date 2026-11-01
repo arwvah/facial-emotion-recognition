@@ -37,7 +37,7 @@ processing people. [Feature status](FEATURES.md) · [Privacy](PRIVACY.md) · [Mo
 The local `./run-trained.sh` launcher automatically uses the separately trained age model when
 `models/trained-age.json` is installed. It shows `AGE ~N` beside each detected face and returns
 `age_estimate_years` in JSON. Poor-quality faces have no age estimate. On the small held-out test
-subset the model's mean absolute error was **7.6 years**; this is an approximate visible-age
+subset the expanded model's mean absolute error was **7.0 years**; this is an approximate visible-age
 estimate, not proof of age. See [TRAINING.md](TRAINING.md) for data provenance and limitations.
 
 ## Locally trained expression model
