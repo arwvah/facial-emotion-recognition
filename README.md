@@ -221,3 +221,9 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for calibration, accuracy/FPS comparisons, 
 INT8 gating, OpenVINO export, Docker commands, CI, packaging, and auxiliary model contracts.
 We have no labeled validation/test dataset, so there is **no claimed real-world accuracy,
 calibration gain, fairness result, GPU speedup, or approved INT8 replacement**.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
+
+Third-party components retain their respective licenses.
