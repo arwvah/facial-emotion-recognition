@@ -16,6 +16,13 @@ from expression_lab.object_detector import COCO_LABELS, ObjectDetector, decode_o
 from expression_lab.recognition_models import NANODET_PATH
 
 
+def quality_focal_gradient(probability, target):
+    p = np.clip(probability, 1e-7, 1 - 1e-7)
+    error = p - target
+    bce = -target * np.log(p) - (1 - target) * np.log1p(-p)
+    return error**3 + 2 * error * p * (1 - p) * bce
+
+
 def session(model):
     opts = ort.SessionOptions()
     opts.intra_op_num_threads = 2
@@ -28,11 +35,21 @@ def session(model):
 def load_split(root, split):
     data = json.loads((root / "annotations" / f"instances_{split}.json").read_text())
     categories = {c["id"]: COCO_LABELS.index(c["name"]) for c in data["categories"]}
+    image_info = {image["id"]: image for image in data["images"]}
     annotations = {}
     for a in data["annotations"]:
         if a.get("iscrowd", 0):
             continue
         x, y, w, h = a["bbox"]
+        image = image_info[a["image_id"]]
+        if (
+            not np.isfinite([x, y, w, h]).all()
+            or min(x, y) < 0
+            or min(w, h) <= 0
+            or x + w > image["width"] + 1
+            or y + h > image["height"] + 1
+        ):
+            raise ValueError(f"Invalid bounding box in {split}: annotation {a['id']}")
         annotations.setdefault(a["image_id"], []).append(
             ([x, y, x + w, y + h], categories[a["category_id"]])
         )
@@ -131,9 +148,12 @@ def main():
     parser.add_argument("--root", type=Path, default=Path("datasets/objects"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--quality-focal", action="store_true")
+    parser.add_argument("--validation-only", action="store_true")
+    parser.add_argument("--patience", type=int, default=3)
     args = parser.parse_args()
-    if args.epochs < 1:
-        parser.error("--epochs must be positive")
+    if args.epochs < 1 or args.patience < 1:
+        parser.error("--epochs and --patience must be positive")
     if args.output.exists():
         raise ValueError("Choose a new output directory")
     args.output.mkdir(parents=True)
@@ -188,7 +208,9 @@ def main():
                 neg = rng.choice(neg, 64, replace=False)
             chosen = np.concatenate([pos, neg])
             targets = np.zeros((len(chosen), 80), np.float32)
-            targets[np.arange(len(pos)), labels[best[pos]]] = 1
+            targets[np.arange(len(pos)), labels[best[pos]]] = (
+                quality[pos] if args.quality_focal else 1
+            )
             xs[level].append(feature[0].reshape(96, -1).T[chosen])
             ys[level].append(targets)
         if (index + 1) % 50 == 0:
@@ -200,6 +222,7 @@ def main():
     best = base
     selected = 0
     history = []
+    stale = 0
     print("Baseline object validation AP50", best_ap, flush=True)
     for epoch in range(1, args.epochs + 1):
         for level in range(3):
@@ -208,7 +231,11 @@ def main():
             ):
                 x, y = xs[level][batch], ys[level][batch]
                 p = 1 / (1 + np.exp(-np.clip(x @ weights[level].T + biases[level], -30, 30)))
-                error = (p - y) * np.where(y > 0, 20, 1)
+                error = (
+                    quality_focal_gradient(p, y)
+                    if args.quality_focal
+                    else (p - y) * np.where(y > 0, 20, 1)
+                )
                 weights[level] -= 0.0001 * (
                     error.T @ x / len(batch) + 0.05 * (weights[level] - anchors[level])
                 )
@@ -218,21 +245,29 @@ def main():
             score = evaluate(current, samples["val"])["mean_ap50"]
             history.append({"epoch": epoch, "validation_ap50": score})
             print(f"Object epoch {epoch}: validation AP50 {score:.4f}", flush=True)
-            if score > best_ap:
+            if score > best_ap + 0.0001:
                 best_ap, best, selected = score, current, epoch
+                stale = 0
+            else:
+                stale += 1
+            if stale >= args.patience:
+                print("Object validation plateau; stopping", flush=True)
+                break
     onnx.checker.check_model(current)
     onnx.save(current, args.output / "last-trained.onnx")
     onnx.save(best, args.output / "selected-model.onnx")
     report = {
         "method": "Frozen NanoDet backbone and regression; SGD classification heads only",
-        "epochs_completed": args.epochs,
+        "epochs_completed": epoch,
+        "maximum_epochs": args.epochs,
+        "classification_loss": "quality focal beta=2" if args.quality_focal else "weighted BCE",
         "selected_epoch": selected,
         "seed": 42,
         "baseline_validation": baseline_val,
         "history": history,
-        "baseline_test": evaluate(base, samples["test"]),
-        "selected_test": evaluate(best, samples["test"]),
-        "last_trained_test": evaluate(current, samples["test"]),
+        "baseline_test": None if args.validation_only else evaluate(base, samples["test"]),
+        "selected_test": None if args.validation_only else evaluate(best, samples["test"]),
+        "last_trained_test": None if args.validation_only else evaluate(current, samples["test"]),
         "selected_sha256": hashlib.sha256(
             (args.output / "selected-model.onnx").read_bytes()
         ).hexdigest(),
@@ -251,8 +286,12 @@ def main():
             {
                 "output": str(args.output),
                 "selected_epoch": selected,
-                "baseline_test_ap50": report["baseline_test"]["mean_ap50"],
-                "selected_test_ap50": report["selected_test"]["mean_ap50"],
+                "baseline_test_ap50": None
+                if args.validation_only
+                else report["baseline_test"]["mean_ap50"],
+                "selected_test_ap50": None
+                if args.validation_only
+                else report["selected_test"]["mean_ap50"],
             },
             indent=2,
         ),

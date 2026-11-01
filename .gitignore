@@ -15,3 +15,9 @@ build/
 dist/
 models/*.xml
 models/*.bin
+datasets/
+*.zip
+*.tar.gz
+*.parquet
+models/trained-expression.json
+models/trained-objects.json

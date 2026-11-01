@@ -15,6 +15,7 @@ DEFAULTS = {
     "expression_margin": 0.0,
     "face_detector_size": 640,
     "object_detector": "none",
+    "object_model_spec": None,
     "object_threshold": 0.4,
     "vision": False,
     "vision_check": False,
@@ -62,6 +63,7 @@ DEFAULTS = {
     "csv": None,
 }
 PATH_OPTIONS = {
+    "object_model_spec",
     "vision_jsonl",
     "video",
     "image",
@@ -115,6 +117,8 @@ def load_yaml(path: Path, allowed: set[str]) -> dict:
 
 
 def validate_options(args):
+    if args.object_model_spec and args.object_detector != "nanodet":
+        raise ValueError("--object-model-spec requires --object-detector nanodet")
     if args.expression_model not in ("ferplus", "hsemotion") or args.object_detector not in (
         "none",
         "nanodet",

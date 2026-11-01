@@ -32,6 +32,16 @@ Expression estimates describe visible patterns, not someone's feelings. Obtain c
 processing people. [Feature status](FEATURES.md) · [Privacy](PRIVACY.md) · [Model card](MODEL_CARD.md)
 · [Development/evaluation](DEVELOPMENT.md) · [Verification](VERIFICATION.md).
 
+## Locally trained expression model
+
+The expanded local training run reached **79.4% raw top-1 accuracy** on the fixed 2,902-image
+expression test subset, compared with 65.6% for the original CNN. This is a local dataset result;
+it does not establish webcam accuracy or independent generalization. See [TRAINING.md](TRAINING.md)
+for split limitations, uncertainty coverage, training commands, and the rejected first object experiment.
+
+If you have the locally trained weights installed, run `./run-trained.sh` (or add `--no-vision`).
+Weights are not bundled in Git or packages; other installations must reproduce the training run.
+
 ## Install and start
 
 Python 3.12 or 3.13. From this checkout, using [uv](https://docs.astral.sh/uv/):

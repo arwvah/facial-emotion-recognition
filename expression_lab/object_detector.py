@@ -1,5 +1,9 @@
 """Local NanoDet-Plus detection with the OpenCV Zoo model contract (Apache-2.0)."""
 
+import json
+import re
+from pathlib import Path
+
 import cv2
 import numpy as np
 import onnxruntime as ort
@@ -125,15 +129,33 @@ def decode_outputs(outputs, threshold=0.4):
 
 
 class ObjectDetector:
-    def __init__(self, threshold=0.4):
+    def __init__(self, threshold=0.4, model_spec=None):
         from .emotion import checksum
         from .recognition_models import NANODET_PATH, NANODET_SHA256
 
         if not 0 < threshold <= 1:
             raise ValueError("Object confidence threshold must be in (0,1]")
-        if not NANODET_PATH.is_file():
+        path, digest = NANODET_PATH, NANODET_SHA256
+        if model_spec:
+            manifest = Path(model_spec)
+            data = json.loads(manifest.read_text())
+            if (
+                not isinstance(data, dict)
+                or set(data) != {"path", "sha256", "labels"}
+                or data["labels"] != list(COCO_LABELS)
+                or not isinstance(data["path"], str)
+            ):
+                raise ValueError(
+                    "Object manifest must specify path, sha256 and the canonical COCO labels"
+                )
+            if not isinstance(data["sha256"], str) or not re.fullmatch(
+                r"[a-f0-9]{64}", data["sha256"]
+            ):
+                raise ValueError("Object manifest requires a SHA-256 digest")
+            path, digest = (manifest.parent / data["path"]).resolve(), data["sha256"]
+        if not path.is_file():
             raise FileNotFoundError("Object detector missing. Run ./run.sh --setup-recognition")
-        if checksum(NANODET_PATH) != NANODET_SHA256:
+        if checksum(path) != digest:
             raise ValueError("Object detector checksum mismatch")
         self.threshold = threshold
         options = ort.SessionOptions()
@@ -142,9 +164,14 @@ class ObjectDetector:
         # print its ~150 optimization warnings on every launch. Errors remain visible.
         options.log_severity_level = 3
         self.session = ort.InferenceSession(
-            str(NANODET_PATH), sess_options=options, providers=["CPUExecutionProvider"]
+            str(path), sess_options=options, providers=["CPUExecutionProvider"]
         )
         self.input_name = self.session.get_inputs()[0].name
+        if (
+            self.session.get_inputs()[0].shape != [1, 3, 416, 416]
+            or self.session.get_inputs()[0].type != "tensor(float)"
+        ):
+            raise ValueError("NanoDet model input must be float32 NCHW 416")
 
     def detect(self, frame):
         image, (left, top, sx, sy) = letterbox(frame)

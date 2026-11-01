@@ -1,6 +1,28 @@
 # Verification — 2026-10-31
 
-## Current release: 1.3 — combined object and expression recognition
+## Local trained-model release 1.4 — 2026-11-01
+
+- Expanded expression training: 22,820 accepted training faces; selected epoch 66, stopped at 81.
+  Fixed test raw top-1 accuracy increased from the previous candidate's 75.81% to 79.39%.
+  Accuracy with uncertain predictions counted incorrect increased from 68.68% to 73.71%.
+  The test subset is reused from the earlier report; this is not an external generalization test.
+- The exported expression model passed ONNX graph validation and numerical comparison with
+  the learned NumPy classifier. It also passed application image inference and a 24-frame
+  video smoke with 36 face detections. Backbone weights remained frozen.
+- Downloaded and checksum-verified the original COCO train annotation JSON; selected and
+  decoded 1,588 native training images. The subset contains all 80 categories and 15,296 boxes.
+  Exact pixel duplicate exclusion and strict box validation passed.
+- Quality-focal gradient passed a finite-difference derivative test. Object training stopped
+  after 10 epochs without a validation gain. The candidate failed the predeclared promotion
+  gate and the pinned original detector remains active.
+- Actual custom-object-manifest loading passed image inference together with the trained
+  expression model. Modified weights or incorrect class mappings are rejected before loading.
+  Diagnostics checks the chosen custom manifests without opening a camera.
+- Original models are preserved; trained expression weights are installed separately and
+  selected by `run-trained.sh`. Models, datasets, outputs, and local manifests are excluded
+  from source packages. See TRAINING.md and the local JSON reports for the actual limits.
+
+## Release 1.3 — combined object and expression recognition
 
 - Downloaded both pinned optional weights and verified exact sizes and SHA-256 hashes.
   `--setup-recognition` and the enhanced launcher's `--check` pass without opening a camera.

@@ -46,7 +46,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None, object
     )
     app = FastAPI(
         title="Expression Lab local inference",
-        version="1.3.0",
+        version="1.4.0",
         description="Local expression estimates, not feelings. Obtain consent before submitting images. Frames are processed in memory; no image storage or webhooks.",
     )
 
@@ -81,7 +81,9 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None, object
             from .object_detector import ObjectDetector
 
             object_model = (
-                object_factory() if object_factory else ObjectDetector(args.object_threshold)
+                object_factory()
+                if object_factory
+                else ObjectDetector(args.object_threshold, args.object_model_spec)
             )
         return object_model.detect(frame)
 
@@ -101,6 +103,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None, object
             "faces": [face.as_dict() for face in faces],
             "objects": objects,
             "object_detector": args.object_detector,
+            "object_model_custom": bool(args.object_model_spec),
             "expression_model": "custom" if args.model_spec else args.expression_model,
             "storage": "memory_only",
             "auxiliary_available": recognizer.auxiliary is not None,
@@ -128,6 +131,7 @@ def create_app(config=None, recognizer_factory=None, vision_factory=None, object
             "vision_enabled": args.vision,
             "vision_model": args.vision_model if args.vision else None,
             "vision_boxes": args.vision and args.vision_boxes,
+            "object_model_custom": bool(args.object_model_spec),
             "object_detector": args.object_detector,
             "expression_model": "custom" if args.model_spec else args.expression_model,
             "expression_margin": args.expression_margin,

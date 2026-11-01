@@ -29,15 +29,17 @@ def main():
     parser.add_argument("--manifest", type=Path, default=Path("datasets/expressions/manifest.csv"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--patience", type=int, default=15)
+    parser.add_argument("--initial-model-spec", type=Path)
     args = parser.parse_args()
-    if args.epochs < 1:
-        parser.error("--epochs must be positive")
+    if args.epochs < 1 or args.patience < 1:
+        parser.error("--epochs and --patience must be positive")
     if args.output.exists():
         raise ValueError("Choose a new output directory; previous runs are preserved")
     args.output.mkdir(parents=True)
     started = time.time()
     rng = np.random.default_rng(42)
-    spec = hsemotion_spec()
+    spec = ModelSpec.load(args.initial_model_spec) if args.initial_model_spec else hsemotion_spec()
     spec.validate()
     graph = onnx.load(spec.path)
     head = graph.graph.node[-1]
@@ -112,6 +114,7 @@ def main():
     best_epoch = 0
     history = []
     step = 0
+    stale = 0
     indices = np.where(train)[0]
     for epoch in range(1, args.epochs + 1):
         for batch in np.array_split(
@@ -133,8 +136,14 @@ def main():
         current = loss(w, b)
         history.append({"epoch": epoch, "validation_nll": current})
         print(f"Epoch {epoch}/{args.epochs}: validation NLL {current:.4f}", flush=True)
-        if current < best_loss:
+        if current < best_loss - 0.0001:
             best_loss, best, best_epoch = current, (w.copy(), b.copy()), epoch
+            stale = 0
+        else:
+            stale += 1
+        if stale >= args.patience:
+            print(f"Validation plateau: stopping after {epoch} epochs", flush=True)
+            break
     w, b = best
     final_w = (w / std).astype(np.float32)
     final_b = (b - mean @ final_w.T).astype(np.float32)
@@ -169,7 +178,11 @@ def main():
     report = {
         "training_method": "Frozen HSEmotion CNN, Adam training of final classifier only",
         "seed": 42,
-        "epochs_completed": args.epochs,
+        "epochs_completed": len(history),
+        "maximum_epochs": args.epochs,
+        "patience": args.patience,
+        "starting_model_sha256": spec.sha256,
+        "dataset_manifest_sha256": hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
         "selected_epoch": best_epoch,
         "split_counts": {s: int(m.sum()) for s, m in masks.items()},
         "excluded_similarity_matches": [

@@ -1,5 +1,25 @@
 # Pretrained CNN provenance
 
+## Local transfer learning (1.4)
+
+The expanded local expression run trained only the final classifier on frozen HSEmotion features.
+It accepted 22,820 training faces and selected epoch 66 using validation NLL; training stopped at
+81 epochs after a plateau. On the fixed 2,902-image test subset, raw top-1 accuracy was 79.39%,
+compared with 75.81% for the first locally trained candidate and 65.61% for the original model.
+This test subset was reported in earlier runs; it is not an unseen external benchmark.
+
+The installed local candidate uses the same RGB224 contract, with unaligned crops and TTA off.
+Weights and their manifest are separate from original pinned assets and are not bundled in Git.
+`run-trained.sh` selects the local expression candidate. Perceptual hash filtering does not
+establish person identity separation. Pretraining overlap, source dataset usage rights, demographic
+performance and actual webcam accuracy remain unverified. No AU/VA heads were trained.
+
+The object experiment used 1,588 native COCO training images and 15,296 boxes. Classification
+heads were trained with quality-focal loss; the backbone and box regression remained frozen.
+Validation AP50 did not improve and training stopped after 10 epochs. The candidate was rejected;
+the original detector remains active. Additional data and epochs are not proof of improvement.
+Full commands, metric definitions, coverage and limitations are in [TRAINING.md](TRAINING.md).
+
 ## Recognition preset (1.3)
 
 The enhanced launcher uses two additional local ONNX models. They are explicitly downloaded

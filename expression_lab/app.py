@@ -114,6 +114,7 @@ def parse_args(argv=None):
             args.config,
             args.calibration,
             args.model_spec,
+            args.object_model_spec,
             args.auxiliary,
         )
         if p
@@ -163,6 +164,43 @@ def run(args):
         from .diagnostics import system_report
 
         report = system_report(args.detector, args.expression_model, args.object_detector)
+        if args.model_spec or args.object_model_spec:
+            from .backends import ModelSpec
+            from .object_detector import ObjectDetector
+
+            selected = {}
+            for name, manifest in (
+                ("custom_expression", args.model_spec),
+                ("custom_objects", args.object_model_spec),
+            ):
+                if manifest:
+                    try:
+                        if name == "custom_expression":
+                            ModelSpec.load(manifest)
+                        else:
+                            ObjectDetector(args.object_threshold, manifest)
+                        selected[name] = {"verified": True, "manifest": str(manifest)}
+                    except (OSError, ValueError, RuntimeError) as exc:
+                        selected[name] = {
+                            "verified": False,
+                            "manifest": str(manifest),
+                            "error": str(exc),
+                        }
+            report["models"].update(selected)
+            expression_ready = report["models"][
+                "custom_expression" if args.model_spec else args.expression_model
+            ]["verified"]
+            object_ready = (
+                args.object_detector == "none"
+                or report["models"][
+                    "custom_objects" if args.object_model_spec else args.object_detector
+                ]["verified"]
+            )
+            report["ready"] = (
+                expression_ready
+                and object_ready
+                and (args.detector == "haar" or report["models"]["yunet"]["verified"])
+            )
         print(json.dumps(report, indent=2))
         return 0 if report["ready"] else 1
     if args.batch:
@@ -184,7 +222,9 @@ def run(args):
     from .object_detector import ObjectDetector, merge_objects
 
     object_detector = (
-        ObjectDetector(args.object_threshold) if args.object_detector == "nanodet" else None
+        ObjectDetector(args.object_threshold, args.object_model_spec)
+        if args.object_detector == "nanodet"
+        else None
     )
     vision_client = client_from_args(args) if args.vision else None
     if vision_client:
@@ -383,6 +423,7 @@ def run(args):
                     "expression_model": "custom" if args.model_spec else args.expression_model,
                     "expression_margin": args.expression_margin,
                     "object_detector": args.object_detector,
+                    "object_model_custom": bool(args.object_model_spec),
                     "detected_objects": detected_objects,
                     "object_overlays": display_objects(),
                     "smoothing_seconds": pipeline.tracker.smoothing,
