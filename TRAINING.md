@@ -1,10 +1,10 @@
 # Local transfer-learning results — 2026-11-01
 
 The [optional YOLO experiment](experiments/yolo_expression/README.md) fine-tunes a
-YOLO26n-cls backbone in a separate environment. Its local job is currently installing
-CUDA dependencies; no YOLO expression score has been measured. Its runner will train,
-select on validation, export, verify and evaluate automatically. The app retains the
-79.39% local expression model during this experiment.
+YOLO26n-cls backbone in a separate environment. Its local download job was stopped at
+the user's request before training began. No YOLO expression score has been measured.
+The existing CNN's classifier was then retrained with the installed tools; the starting
+model won validation selection, so the app retains its 79.39% local expression model.
 
 The original expression-head and object-head runs below train final classification layers
 on frozen CNN features. They do not retrain backbones. NumPy, ONNX and ONNX Runtime are
@@ -321,3 +321,43 @@ To inspect this experimental candidate without changing the default model:
 ```bash
 ./run-trained.sh --model-spec outputs/expression-residual-2026-11-01/model.json
 ```
+
+## Continued training of the existing expression classifier
+
+The existing classifier was trained locally without downloading packages or weights.
+Its CNN backbone remained frozen. The run reused the earlier 22,820 training faces and
+their horizontal flips (45,640 views), with 10% feature dropout and 2% label smoothing.
+Validation and test membership remained 2,888 and 2,902 faces respectively.
+
+The cached features were checked against the starting model and dataset hashes, split
+counts, and seven fresh CNN inference views from training/validation. Cache contents
+are SHA-256 recorded. Test features were scored only after selection and export checks.
+
+Training ran **12 epochs** before the validation-loss plateau stopped it. No trained
+checkpoint improved on the starting validation NLL of **0.59768**. The last trained
+checkpoint had validation NLL **0.59977** and validation top-1 **78.15%**. The starting
+checkpoint was selected (epoch 0); its fixed test raw top-1 remains **79.39%**. This run
+does not establish an accuracy improvement. The active model was not replaced.
+
+The actual last trained weights are preserved separately as `last-trained.onnx` and
+`last-trained.json`; the validation-selected `model.json` points to the starting model.
+Both exports pass ONNX checking and numerical parity on a validation image. Backbone
+weights were checked unchanged. The actual last trained export also passes app inference.
+The same configuration was repeated to add preservation and verification of the last
+trained artifact; checkpoint selection and hyperparameters were unchanged.
+
+Reports and local artifacts: `outputs/expression-continued-final-2026-11-01/`.
+Reproduce using the earlier residual run's feature cache:
+
+```bash
+PYTHONPATH=. OPENBLAS_NUM_THREADS=2 .venv/bin/python scripts/train_expression_cached.py \
+  --manifest datasets/expanded-v1/expressions/manifest.csv \
+  --baseline models/trained-expression.json \
+  --reference-report outputs/expression-expanded-2026-11-01/training-report.json \
+  --feature-run outputs/expression-residual-2026-11-01 \
+  --output outputs/expression-continued-new --epochs 80 --patience 12
+```
+
+This reuses a previously reported test subset and validation set. Person identity
+separation, dataset rights, and pretraining overlap remain unverified. Training and
+export artifacts are local and excluded from Git and packages.

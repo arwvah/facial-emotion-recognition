@@ -72,7 +72,9 @@ CPU latency; the benchmark excludes face detection and image decoding. Full
 training metrics are in `experiment/fit/results.csv`, and `provenance.json` records
 library versions, GPU, starting weight hash and split counts.
 
-For the local background job started on 2026-11-01:
+The local background job started on 2026-11-01 was **stopped at the user's request**
+while installing dependencies. It never reached training. Its status is `cancelled`;
+the service is inactive and will not continue the downloads. Inspect that job with:
 
 ```bash
 systemctl --user status expression-yolo-training.service

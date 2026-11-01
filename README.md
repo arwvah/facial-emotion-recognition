@@ -52,7 +52,8 @@ Weights are not bundled in Git or packages; other installations must reproduce t
 
 An optional [YOLO expression experiment](experiments/yolo_expression/README.md) adds
 full-backbone fine-tuning, isolated CUDA dependencies, ONNX export checks and a comparison
-against the current model. Training results are pending. This checkout-only experiment
+against the current model. Its local download job was stopped before training; no YOLO
+expression score is available. This checkout-only experiment
 uses AGPL-3.0 terms and is separate from the application's Apache-2.0 package.
 
 ## Install and start
