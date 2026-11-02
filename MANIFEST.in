@@ -7,11 +7,17 @@ recursive-include tests *.py
 recursive-include .github *.yml
 prune models
 prune outputs
+prune datasets
 prune .venv
 prune .venv-yolo
+prune .venv-data
 prune experiments
 prune .mypy_cache
 
 include TRAINING.md run-trained.sh
+include FUSION_TRAINING.md
+include run-fusion.sh
 
 recursive-include scripts train*.py expand*.py fetch*.py download_age_dataset.py
+recursive-include scripts select_expression*.py
+recursive-include scripts prepare_fer2013_dataset.py

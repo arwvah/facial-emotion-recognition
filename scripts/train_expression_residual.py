@@ -37,14 +37,22 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--patience", type=int, default=12)
+    parser.add_argument("--feature-run", type=Path, help="Reuse verified frozen-CNN features")
+    parser.add_argument("--hidden", type=int, default=64)
+    parser.add_argument("--dropout", type=float, default=0.25)
+    parser.add_argument("--learning-rate", type=float, default=0.0003)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--defer-test", action="store_true", help="Select using validation only")
     args = parser.parse_args()
     if min(args.epochs, args.patience) < 1:
         parser.error("epochs/patience must be positive")
+    if not 1 <= args.hidden <= 1024 or not 0 <= args.dropout < 1 or not 0 < args.learning_rate < 1:
+        parser.error("Invalid hidden size, dropout, or learning rate")
     if args.output.exists():
         raise ValueError("Choose a new output directory")
     args.output.mkdir(parents=True)
     started = time.time()
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(args.seed)
     spec = ModelSpec.load(args.baseline)
     model = onnx.load(spec.path)
     head = model.graph.node[-1]
@@ -77,32 +85,63 @@ def main():
     )
     n = len(rows)
     total = n + counts["train"]
-    x = np.lib.format.open_memmap(
-        args.output / "features.npy", mode="w+", dtype="float32", shape=(total, dim)
-    )
     y = np.zeros(total, np.int64)
     splits = np.array([r["split"] for r in rows] + ["train"] * counts["train"])
-    flip = n
-    for i, row in enumerate(rows):
-        image = cv2.imread(str(row["path"]))
-        if image is None:
-            raise ValueError(f"Cannot decode {row['path']}")
-        y[i] = spec.labels.index(row["label"])
-        x[i] = session.run([head.input[0]], {session.get_inputs()[0].name: spec.tensor(image)})[0][
-            0
-        ]
-        if row["split"] == "train":
-            x[flip] = session.run(
-                [head.input[0]], {session.get_inputs()[0].name: spec.tensor(cv2.flip(image, 1))}
+    feature_sha = None
+    if args.feature_run:
+        cached = json.loads((args.feature_run / "training-report.json").read_text())
+        if (
+            cached["starting_model_sha256"] != spec.sha256
+            or cached["manifest_sha256"] != reference["dataset_manifest_sha256"]
+            or cached["split_counts"] != counts
+        ):
+            raise ValueError("Cached feature provenance mismatch")
+        feature_path = args.feature_run / "features.npy"
+        x = np.load(feature_path, mmap_mode="r")
+        if x.shape != (total, dim) or x.dtype != np.float32:
+            raise ValueError("Cached feature shape/dtype mismatch")
+        with feature_path.open("rb") as handle:
+            feature_sha = hashlib.file_digest(handle, "sha256").hexdigest()
+        y[:n] = [spec.labels.index(r["label"]) for r in rows]
+        original_train = np.where(splits[:n] == "train")[0]
+        y[n:] = y[original_train]
+        checks = [int(original_train[0]), int(original_train[-1]), n, total - 1]
+        checks += [i for i, row in enumerate(rows) if row["split"] == "calibration"][:2]
+        for index in checks:
+            source = index if index < n else int(original_train[index - n])
+            image = cv2.imread(str(rows[source]["path"]))
+            if image is None:
+                raise ValueError("Cannot read cache verification image")
+            if index >= n:
+                image = cv2.flip(image, 1)
+            actual = session.run(
+                [head.input[0]], {session.get_inputs()[0].name: spec.tensor(image)}
             )[0][0]
-            y[flip] = y[i]
-            flip += 1
-        if (i + 1) % 500 == 0:
-            print(
-                f"Features: {i + 1}/{n} original faces plus training flips; {time.time() - started:.0f}s",
-                flush=True,
-            )
-    x.flush()
+            np.testing.assert_allclose(actual, x[index], atol=1e-5, rtol=1e-5)
+        print("Feature cache provenance and inference checks passed", flush=True)
+    else:
+        x = np.lib.format.open_memmap(
+            args.output / "features.npy", mode="w+", dtype="float32", shape=(total, dim)
+        )
+        flip = n
+        for i, row in enumerate(rows):
+            image = cv2.imread(str(row["path"]))
+            if image is None:
+                raise ValueError(f"Cannot decode {row['path']}")
+            y[i] = spec.labels.index(row["label"])
+            x[i] = session.run([head.input[0]], {session.get_inputs()[0].name: spec.tensor(image)})[
+                0
+            ][0]
+            if row["split"] == "train":
+                x[flip] = session.run(
+                    [head.input[0]], {session.get_inputs()[0].name: spec.tensor(cv2.flip(image, 1))}
+                )[0][0]
+                y[flip] = y[i]
+                flip += 1
+            if (i + 1) % 500 == 0:
+                print(f"Features: {i + 1}/{n} faces plus training flips", flush=True)
+        x.flush()
+    del session
     train = np.where(splits == "train")[0]
     val = np.where(splits == "calibration")[0]
     test = np.where(splits == "test")[0]
@@ -116,7 +155,7 @@ def main():
     std = np.maximum(
         np.sqrt(np.maximum(squares / len(train) - mean.astype(np.float64) ** 2, 0)), 0.1
     ).astype(np.float32)
-    hidden = 64
+    hidden = args.hidden
     parameters = [
         rng.normal(0, np.sqrt(2 / dim), (dim, hidden)).astype(np.float32),
         np.zeros(hidden, np.float32),
@@ -151,7 +190,8 @@ def main():
             a, b, c, d = parameters
             pre = xb @ a + b
             h = np.maximum(pre, 0)
-            drop = (rng.random(h.shape) < 0.75).astype(np.float32) / 0.75
+            keep = 1 - args.dropout
+            drop = (rng.random(h.shape) < keep).astype(np.float32) / keep
             hd = h * drop
             error = softmax(original @ base_w.T + base_b + hd @ c + d)
             error[np.arange(len(ids)), y[ids]] -= 1
@@ -168,7 +208,9 @@ def main():
                 v *= 0.999
                 v += 0.001 * g * g
                 parameter -= (
-                    0.0003 * (m / (1 - 0.9**step)) / (np.sqrt(v / (1 - 0.999**step)) + 1e-8)
+                    args.learning_rate
+                    * (m / (1 - 0.9**step))
+                    / (np.sqrt(v / (1 - 0.999**step)) + 1e-8)
                 )
         loss, accuracy = val_metrics(parameters)
         history.append({"epoch": epoch, "validation_nll": loss, "validation_top1": accuracy})
@@ -215,7 +257,7 @@ def main():
     manifest_path = args.output / "model.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
     backend = InferenceBackend(ModelSpec.load(manifest_path))
-    first = test[0]
+    first = val[0]
     actual = backend.predict(cv2.imread(str(rows[first]["path"])))
     expected = softmax(
         forward(
@@ -228,24 +270,31 @@ def main():
     )[0]
     expected = expected[[spec.labels.index(label) for label in RAW_LABELS]]
     np.testing.assert_allclose(actual, expected, atol=1e-5)
-    truth = np.array([RAW_LABELS.index(spec.labels[i]) for i in y[test]])
+    baseline = trained = None
+    if not args.defer_test:
+        truth = np.array([RAW_LABELS.index(spec.labels[i]) for i in y[test]])
 
-    def evaluate(logits):
-        return metrics(
-            truth,
-            softmax(logits)[:, [spec.labels.index(label) for label in RAW_LABELS]],
-            threshold=0.5,
-            margin=0.08,
-        )
+        def evaluate(logits):
+            return metrics(
+                truth,
+                softmax(logits)[:, [spec.labels.index(label) for label in RAW_LABELS]],
+                threshold=0.5,
+                margin=0.08,
+            )
 
-    xt = np.asarray(x[test])
-    bt = xt @ base_w.T + base_b
-    baseline = evaluate(bt)
-    trained = evaluate(forward(xt, bt, best, mean, std))
+        xt = np.asarray(x[test])
+        bt = xt @ base_w.T + base_b
+        baseline = evaluate(bt)
+        trained = evaluate(forward(xt, bt, best, mean, std))
     vl, va = val_metrics(best)
     report = {
-        "method": "Frozen CNN with 64-unit residual ReLU classifier, training-only horizontal flips and dropout",
-        "seed": 42,
+        "method": "Frozen CNN with residual ReLU classifier, training-only horizontal flips and dropout",
+        "seed": args.seed,
+        "hidden": hidden,
+        "dropout": args.dropout,
+        "learning_rate": args.learning_rate,
+        "test_deferred": args.defer_test,
+        "feature_cache_sha256": feature_sha,
         "split_counts": counts,
         "augmented_training_examples": len(train),
         "starting_model_sha256": spec.sha256,
@@ -268,8 +317,8 @@ def main():
     print(
         json.dumps(
             {
-                "baseline_top1": baseline["raw_top1_accuracy"],
-                "candidate_top1": trained["raw_top1_accuracy"],
+                "baseline_top1": baseline["raw_top1_accuracy"] if baseline else None,
+                "candidate_top1": trained["raw_top1_accuracy"] if trained else None,
                 "selected_epoch": best_epoch,
                 "candidate_validation": report["candidate_validation"],
             },

@@ -1,5 +1,25 @@
 # Pretrained CNN provenance
 
+## Optional local fusion candidate — 2026-11-02
+
+The optional `run-fusion.sh` launcher uses a newly trained classifier on frozen HSEmotion
+and FER+ features. On the fixed local 2,902-image subset, raw top-1 changed from 79.39%
+to 79.46%, uncertainty-counted accuracy from 73.71% to 74.84%, and NLL from 0.59564 to
+0.59012. Mean CPU classification latency changed from 8.81 to 17.92 ms per face crop.
+This small raw gain is two additional correct labels, not evidence of a reliable general gain.
+
+On 7,178 source-test images from a pinned FER-2013 mirror, raw accuracy decreased from
+38.37% to 37.17%. Both models perform poorly on that source. A source-domain selector,
+additional-data head training, and final-convolution fine-tuning failed their target gates.
+The faster 79.39% classifier remains active in `run-trained.sh`; fusion is opt-in.
+
+The additional mirror supplied 3,346 screened training images and a separate source test
+split. FER+ pretraining overlap and person separation are unknown; that test was used
+diagnostically and is not an independent generalization benchmark. Validation and the
+original test subset have also been reused across experiments. No target-camera or
+demographic fairness claim follows. Full preprocessing, data provenance, commands and
+results are in [FUSION_TRAINING.md](FUSION_TRAINING.md).
+
 ## Expanded age model (1.5.1)
 
 The active local age head was retrained on **7,531 accepted training faces** from the same
@@ -128,9 +148,8 @@ claim to recognize everything is made. See [VISION.md](VISION.md).
 - **License:** the upstream FER+ model README identifies this model as MIT. Weights are
   downloaded from upstream, not bundled in source. Refer to the upstream repositories for
   their license notices and to the original dataset terms for any training-data use.
-- **Evaluation:** no new training or target-camera accuracy benchmark has been performed.
-  A successful inference smoke test is evidence that the pipeline runs, not a measure of
-  expression-recognition accuracy.
+- **Evaluation:** no target-camera accuracy benchmark has been performed. Local derived
+  models are evaluated as described above; a smoke test alone is not an accuracy measure.
 
 ## Face detector added in 0.2
 

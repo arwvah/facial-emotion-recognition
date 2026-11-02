@@ -50,6 +50,13 @@ for split limitations, uncertainty coverage, training commands, and the rejected
 If you have the locally trained weights installed, run `./run-trained.sh` (or add `--no-vision`).
 Weights are not bundled in Git or packages; other installations must reproduce the training run.
 
+An [experimental fusion candidate](FUSION_TRAINING.md) combines the installed HSEmotion
+and FER+ CNNs. Local raw accuracy changed from 79.39% to 79.46%; accuracy counting
+uncertain predictions incorrect changed from 73.71% to 74.84%. It approximately doubles
+CPU classification time and performs worse on the separate FER-2013 source test split,
+so the faster model remains the default. With locally trained candidate weights installed,
+run `./run-fusion.sh --no-vision` to try it.
+
 An optional [YOLO expression experiment](experiments/yolo_expression/README.md) adds
 full-backbone fine-tuning, isolated CUDA dependencies, ONNX export checks and a comparison
 against the current model. Its local download job was stopped before training; no YOLO

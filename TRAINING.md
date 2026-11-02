@@ -1,4 +1,9 @@
-# Local transfer-learning results — 2026-11-01
+# Local transfer-learning results
+
+The [2026-11-02 fusion experiment](FUSION_TRAINING.md) trained a classifier on the two
+installed CNNs and selected a candidate with 79.46% raw accuracy on the fixed local test
+subset, compared with 79.39% before. The raw gain is small, and CPU classification time
+approximately doubles. A separate extra-data ablation did not improve validation.
 
 The [optional YOLO experiment](experiments/yolo_expression/README.md) fine-tunes a
 YOLO26n-cls backbone in a separate environment. Its local download job was stopped at

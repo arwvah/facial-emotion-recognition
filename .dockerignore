@@ -1,9 +1,11 @@
 .venv
 .venv-yolo
+.venv-data
 experiments
 .git
 __pycache__
 outputs
+datasets
 models
 .ruff_cache
 .mypy_cache

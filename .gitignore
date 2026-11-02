@@ -20,6 +20,8 @@ datasets/
 *.tar.gz
 *.parquet
 models/trained-expression.json
+models/trained-expression-fusion.json
 models/trained-objects.json
 models/trained-age.json
 .venv-yolo/
+.venv-data/
